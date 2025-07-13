@@ -30,19 +30,23 @@ def get_value_at_index(obj: Union[Sequence, Mapping], index: int) -> Any:
         return obj["result"][index]
 
 
-def add_comfyui_directory_to_sys_path(comfyui_path: pathlib.Path) -> None:
+def add_comfyui_directory_to_sys_path(comfyui_path: pathlib.Path | None) -> None:
     """
     Add 'ComfyUI' to the sys.path
     """
+    if comfyui_path is None:
+        raise ValueError("comfyui_path is None")
     if os.path.isdir(comfyui_path):
         sys.path.append(str(comfyui_path))
         print(f"'{comfyui_path}' added to sys.path")
 
 
-def add_extra_model_paths(comfyui_path: pathlib.Path) -> None:
+def add_extra_model_paths(comfyui_path: pathlib.Path | None) -> None:
     """
     Parse the optional extra_model_paths.yaml file and add the parsed paths to the sys.path.
     """
+    if comfyui_path is None:
+        raise ValueError("comfyui_path is None")
     try:
         from main import load_extra_path_config
     except ImportError:
@@ -98,11 +102,8 @@ def main() -> None:
         with torch.inference_mode():
             emptylatentimage = NODE_CLASS_MAPPINGS["EmptyLatentImage"]()
             emptylatentimage_5 = emptylatentimage.generate(
-                # width=864,
                 width=manager.config.width,
-                # height=1536,
                 height=manager.config.height,
-                # batch_size=2,
                 batch_size=manager.config.batch,
             )
 
@@ -110,17 +111,13 @@ def main() -> None:
                 "CheckpointLoaderSimple"
             ]()
             checkpointloadersimple_12 = checkpointloadersimple.load_checkpoint(
-                # ckpt_name="cyberrealisticPony_v120.safetensors"
                 ckpt_name=manager.config.ckpt,
             )
 
             loraloader = NODE_CLASS_MAPPINGS["LoraLoader"]()
             loraloader_10 = loraloader.load_lora(
-                # lora_name="abbychantel.v2.0.safetensors",
                 lora_name=manager.config.lora,
-                # strength_model=1.5000000000000002,
                 strength_model=manager.config.lora_strength,
-                # strength_clip=1.5000000000000002,
                 strength_clip=manager.config.lora_strength,
                 model=get_value_at_index(checkpointloadersimple_12, 0),
                 clip=get_value_at_index(checkpointloadersimple_12, 1),
@@ -128,60 +125,50 @@ def main() -> None:
 
             cliptextencode = NODE_CLASS_MAPPINGS["CLIPTextEncode"]()
             cliptextencode_6 = cliptextencode.encode(
-                # text="abbychantel, thicc thighs, wide hips, photorealistic, ultrarealistic",
                 text=manager.config.system_prompt,
                 clip=get_value_at_index(loraloader_10, 1),
             )
 
             cliptextencode_15 = cliptextencode.encode(
-                # text="black bikini",
                 text=manager.config.next_sub_prompt,
                 clip=get_value_at_index(loraloader_10, 1),
             )
 
             cliptextencode_24 = cliptextencode.encode(
-                # text="by the pool, sunny, palm trees, clay color tiles",
                 text=manager.config.next_sub_prompt,
                 clip=get_value_at_index(loraloader_10, 1),
             )
 
             cliptextencode_26 = cliptextencode.encode(
-                # text="standing, afar from the viewer, viewed from head to feet",
                 text=manager.config.next_sub_prompt,
                 clip=get_value_at_index(loraloader_10, 1),
             )
 
             cliptextencode_28 = cliptextencode.encode(
-                # text="",
                 text=manager.config.next_sub_prompt,
                 clip=get_value_at_index(loraloader_10, 1),
             )
 
             cliptextencode_7 = cliptextencode.encode(
-                # text="text, watermark, big areola, small breasts, medium-sized breasts, unbalanced breasts, underexposed, ugly, (worst quality, low quality, lowres, low details, oversaturated, undersaturated, overexposed, grayscale, (blurry, grainy), cropped, out of frame, out of focus, (weird hands:1.2), (bad nails:1.2), (extra limbs:1.9), mutant, glitch, uncanny, cross eye, ((3d art, drawing, unrealistic:1.9)), ((glitchy face:1.2)), ((mora than 5 fingers per hand:2.0)), ((more than 5 toes per foot:2.0)), ((weird fingers:2.0))",
                 text=manager.config.next_neg_prompt,
                 clip=get_value_at_index(loraloader_10, 1),
             )
 
             cliptextencode_31 = cliptextencode.encode(
-                # text="((simple background:1.2))",
                 text=manager.config.next_neg_prompt,
                 clip=get_value_at_index(loraloader_10, 1),
             )
 
             controlnetloader = NODE_CLASS_MAPPINGS["ControlNetLoader"]()
             controlnetloader_34 = controlnetloader.load_controlnet(
-                # control_net_name="SDXL/controlnet-union-sdxl-1.0/diffusion_pytorch_model_promax.safetensors"
                 control_net_name=manager.config.controlnet,
             )
 
             loadimage = NODE_CLASS_MAPPINGS["LoadImage"]()
-            # loadimage_51 = loadimage.load_image(image="Sample - Pose (53).png")
             loadimage_51 = loadimage.load_image(
                 image=manager.config.pose_image
             )
 
-            # loadimage_56 = loadimage.load_image(image="ComfyUI_00104_.png")
             loadimage_56 = loadimage.load_image(
                 image=manager.config.face_swap_image
             )
@@ -275,11 +262,8 @@ def main() -> None:
                 )
 
                 ksampler_3 = ksampler.sample(
-                    # seed=random.randint(1, 2**64),
                     seed=manager.config.seed,
-                    # steps=35,
                     steps=manager.config.steps,
-                    # cfg=8,
                     cfg=manager.config.guidance_scale,
                     sampler_name="euler",
                     scheduler="normal",
