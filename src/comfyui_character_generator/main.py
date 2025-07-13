@@ -13,7 +13,7 @@ def main() -> None:
 
     for _ in range(manager.config.loop_count):
         command: str = shlex.quote(
-            (manager.basedir / "generate.sh").as_posix()
+            (manager.basedir / "bin" / "generate.sh").as_posix()
         )
         args: tuple[str, ...] = (
             shlex.quote(manager.config.venv_path.as_posix()),
