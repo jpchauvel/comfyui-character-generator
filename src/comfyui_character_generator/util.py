@@ -42,7 +42,7 @@ DEFAULT_ASPECT_RATIO: str = "1:1"
 DEFAULT_LOOP_COUNT: int = 1
 DEFAULT_SEED_GENERATION: SeedGenerationMethod = (
     SeedGenerationMethod.INCREMENT
-)  # 0: Increment, 1: Decrement, 2: Random
+)  # 1: Increment, 2: Decrement, 3: Random
 
 
 def get_args() -> argparse.Namespace:
@@ -50,9 +50,15 @@ def get_args() -> argparse.Namespace:
         description="Automated ComfyUI Character Generator.",
     )
     parser.add_argument(
+        "--config_path",
+        type=str,
+        default=None,
+        help="Path to TOML config file.",
+    )
+    parser.add_argument(
         "--comfyui_path",
         type=str,
-        required=True,
+        default=None,
         help="Path to ComfyUI directory.",
     )
     parser.add_argument(
@@ -63,19 +69,19 @@ def get_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--ckpt_path",
-        required=True,
+        default=None,
         help="Single .safetensors checkpoint file. Relative to checkpoint directory.",
     )
     parser.add_argument(
         "--lora_path",
         type=str,
-        required=True,
+        default=None,
         help="Path to character LoRA .safetensors file. Relative to lora directory.",
     )
     parser.add_argument(
         "--controlnet_path",
         type=str,
-        required=True,
+        default=None,
         help="Path to ControlNet .safetensors file. Relative to controlnet directory.",
     )
     parser.add_argument(
@@ -128,27 +134,27 @@ def get_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--system_prompt_path",
-        required=True,
+        default=None,
         help="Path to system prompt text file.",
     )
     parser.add_argument(
         "--neg_prompts_path",
-        required=True,
+        default=None,
         help="Path to negative prompts text file.",
     )
     parser.add_argument(
         "--sub_prompts_path",
-        required=True,
+        default=None,
         help="Path to sub-prompts text file. Prompts are separeted by newlines.",
     )
     parser.add_argument(
         "--face_swap_image_path",
-        required=True,
+        default=None,
         help="Path to face swap image file.",
     )
     parser.add_argument(
         "--pose_image_path",
-        required=True,
+        default=None,
         help="Path to pose image file.",
     )
     parser.add_argument(
@@ -161,7 +167,7 @@ def get_args() -> argparse.Namespace:
         "--seed_generation",
         type=int,
         default=DEFAULT_SEED_GENERATION,
-        help="Seed generation method (0: Increment, 1: Decrement, 2: Random).",
+        help="Seed generation method (1: Increment, 2: Decrement, 3: Random).",
     )
     parser.add_argument(
         "--output_path",
@@ -187,6 +193,7 @@ class Config:
     lora_strength: float = DEFAULT_LORA_STRENGTH
     width: int = DEFAULT_WIDTH
     height: int = int(DEFAULT_WIDTH * ASPECT_RATIO[DEFAULT_ASPECT_RATIO])
+    aspect_ratio: str = DEFAULT_ASPECT_RATIO
     system_prompt: str = ""
     neg_prompts: list[str] = field(default_factory=list)
     sub_prompts: list[str] = field(default_factory=list)
@@ -194,7 +201,7 @@ class Config:
     pose_image: str | None = None
     loop_count: int = DEFAULT_LOOP_COUNT
     seed_generation: SeedGenerationMethod = DEFAULT_SEED_GENERATION
-    output_path: pathlib.Path | None = None
+    output_path: pathlib.Path = pathlib.Path("")
 
     def __init__(self) -> None:
         super().__init__()
@@ -264,7 +271,27 @@ class AppManager:
         else:
             self._config = Config()
             self._args = get_args()
-            self._set_config_from_args()
+            if self._args.config_path is not None:
+                self._config = load_toml_config(self._args.config_path)
+            elif None not in (
+                self._args.comfyui_path,
+                self._args.ckpt_path,
+                self._args.lora_path,
+                self._args.controlnet_path,
+                self._args.system_prompt_path,
+                self._args.neg_prompts_path,
+                self._args.sub_prompts_path,
+                self._args.face_swap_image_path,
+                self._args.pose_image_path,
+            ):
+                self._set_config_from_args()
+            else:
+                raise ValueError(
+                    "All of the following must be provided: "
+                    "--comfyui_path, --ckpt_path, --lora_path, "
+                    "--controlnet_path, --system_prompt_path, --neg_prompts_path, "
+                    "--sub_prompts_path, --face_swap_image_path, --pose_image_path"
+                )
 
     def _set_config_from_args(self) -> None:
         if self._args is None:
@@ -281,6 +308,7 @@ class AppManager:
         self.config.batch = self._args.batch
         self.config.lora_strength = self._args.lora_strength
         self._set_resolution()
+        self.config.aspect_ratio = self._args.aspect_ratio
         self._set_system_prompt()
         self._set_neg_prompts()
         self._set_sub_prompts()
@@ -290,7 +318,7 @@ class AppManager:
         self.config.seed_generation = SeedGenerationMethod(
             self._args.seed_generation
         )
-        self.config.output_path = self._args.output_path
+        self.config.output_path = pathlib.Path(self._args.output_path)
 
     def _set_comfyui_path(self) -> None:
         if self._args is None:
@@ -311,7 +339,7 @@ class AppManager:
             self._args.venv_path
             if self.config.venv_path is None
             else self.config.venv_path
-        )
+        ).expanduser()
         venv_path = self.config.comfyui_path / self._args.venv_path
         if not os.path.isdir(venv_path):
             raise ValueError(f"Environment directory not found: {venv_path}")
@@ -325,7 +353,7 @@ class AppManager:
             / MODEL_DIRECTORY
             / CHECKPOINT_DIRECTORY
             / self._args.ckpt_path
-        )
+        ).expanduser()
         if not os.path.isfile(ckpt_path):
             raise ValueError(f"Checkpoint file not found: {ckpt_path}")
         self.config.ckpt = self._args.ckpt_path
@@ -338,7 +366,7 @@ class AppManager:
             / MODEL_DIRECTORY
             / LORA_DIRECTORY
             / self._args.lora_path
-        )
+        ).expanduser()
         if not os.path.isfile(lora_path):
             raise ValueError(f"Lora file not found: {lora_path}")
         self.config.lora = self._args.lora_path
@@ -351,7 +379,7 @@ class AppManager:
             / MODEL_DIRECTORY
             / CONTROLNET_DIRECTORY
             / self._args.controlnet_path
-        )
+        ).expanduser()
         if not os.path.isfile(controlnet_path):
             raise ValueError(f"Controlnet file not found: {controlnet_path}")
         self.config.controlnet = self._args.controlnet_path
@@ -446,29 +474,30 @@ class AppManager:
 
 def dump_toml(manager: AppManager) -> str:
     doc: TOMLDocument = document()
-    doc_manager: Table = table()
-    doc_manager.add("comfyui_path", str(manager.config.comfyui_path))
-    doc_manager.add("venv_path", str(manager.config.venv_path))
-    doc_manager.add("ckpt", manager.config.ckpt)
-    doc_manager.add("lora", manager.config.lora)
-    doc_manager.add("controlnet", manager.config.controlnet)
-    doc_manager.add("disable_controlnet", manager.config.disable_controlnet)
-    doc_manager.add("steps", manager.config.steps)
-    doc_manager.add("seed", manager.config.seed)
-    doc_manager.add("guidance_scale", manager.config.guidance_scale)
-    doc_manager.add("lora_strength", manager.config.lora_strength)
-    doc_manager.add("batch", manager.config.batch)
-    doc_manager.add("width", manager.config.width)
-    doc_manager.add("height", manager.config.height)
-    doc_manager.add("system_prompt", manager.config.system_prompt)
-    doc_manager.add("neg_prompt", manager.config.neg_prompts)
-    doc_manager.add("sub_prompt", manager.config.sub_prompts)
-    doc_manager.add("face_swap_image", manager.config.face_swap_image)
-    doc_manager.add("pose_image", manager.config.pose_image)
-    doc_manager.add("loop_count", manager.config.loop_count)
-    doc_manager.add("seed_generation", manager.config.seed_generation)
-    doc_manager.append("output_path", manager.config.output_path)
-    doc.add("manager", doc_manager)
+    doc_config: Table = table()
+    doc_config.add("comfyui_path", str(manager.config.comfyui_path))
+    doc_config.add("venv_path", str(manager.config.venv_path))
+    doc_config.add("ckpt", manager.config.ckpt)
+    doc_config.add("lora", manager.config.lora)
+    doc_config.add("controlnet", manager.config.controlnet)
+    doc_config.add("disable_controlnet", manager.config.disable_controlnet)
+    doc_config.add("steps", manager.config.steps)
+    doc_config.add("seed", manager.config.seed)
+    doc_config.add("guidance_scale", manager.config.guidance_scale)
+    doc_config.add("lora_strength", manager.config.lora_strength)
+    doc_config.add("batch", manager.config.batch)
+    doc_config.add("width", manager.config.width)
+    doc_config.add("height", manager.config.height)
+    doc_config.add("aspect_ratio", manager.config.aspect_ratio)
+    doc_config.add("system_prompt", manager.config.system_prompt)
+    doc_config.add("neg_prompts", manager.config.neg_prompts)
+    doc_config.add("sub_prompts", manager.config.sub_prompts)
+    doc_config.add("face_swap_image", manager.config.face_swap_image)
+    doc_config.add("pose_image", manager.config.pose_image)
+    doc_config.add("loop_count", manager.config.loop_count)
+    doc_config.add("seed_generation", manager.config.seed_generation)
+    doc_config.add("output_path", str(manager.config.output_path))
+    doc.add("config", doc_config)
     return dumps(doc)
 
 
@@ -476,25 +505,122 @@ def load_toml(toml_data: str) -> Config:
     doc: TOMLDocument = loads(toml_data)
     doc_dict: dict[str, Any] = doc.value
     config: Config = Config()
-    config.comfyui_path = pathlib.Path(doc_dict["manager"]["comfyui_path"])
-    config.venv_path = pathlib.Path(doc_dict["manager"]["venv_path"])
-    config.ckpt = doc_dict["manager"]["ckpt"]
-    config.lora = doc_dict["manager"]["lora"]
-    config.controlnet = doc_dict["manager"]["controlnet"]
-    config.disable_controlnet = doc_dict["manager"]["disable_controlnet"]
-    config.steps = doc_dict["manager"]["steps"]
-    config.seed = doc_dict["manager"]["seed"]
-    config.guidance_scale = doc_dict["manager"]["guidance_scale"]
-    config.batch = doc_dict["manager"]["batch"]
-    config.lora_strength = doc_dict["manager"]["lora_strength"]
-    config.width = doc_dict["manager"]["width"]
-    config.height = doc_dict["manager"]["height"]
-    config.system_prompt = doc_dict["manager"]["system_prompt"]
-    config.neg_prompts = doc_dict["manager"]["neg_prompt"]
-    config.sub_prompts = doc_dict["manager"]["sub_prompt"]
-    config.face_swap_image = doc_dict["manager"]["face_swap_image"]
-    config.pose_image = doc_dict["manager"]["pose_image"]
-    config.loop_count = doc_dict["manager"]["loop_count"]
-    config.seed_generation = doc_dict["manager"]["seed_generation"]
-    config.output_path = pathlib.Path(doc_dict["manager"]["output_path"])
+    config.comfyui_path = pathlib.Path(
+        doc_dict["config"]["comfyui_path"]
+    ).expanduser()
+    config.venv_path = pathlib.Path(
+        doc_dict["config"]["venv_path"]
+    ).expanduser()
+    config.ckpt = doc_dict["config"]["ckpt"]
+    config.lora = doc_dict["config"]["lora"]
+    config.controlnet = doc_dict["config"]["controlnet"]
+    config.disable_controlnet = doc_dict["config"]["disable_controlnet"]
+    config.steps = doc_dict["config"]["steps"]
+    config.seed = doc_dict["config"]["seed"]
+    config.guidance_scale = doc_dict["config"]["guidance_scale"]
+    config.batch = doc_dict["config"]["batch"]
+    config.lora_strength = doc_dict["config"]["lora_strength"]
+    config.width = doc_dict["config"]["width"]
+    config.height = doc_dict["config"]["height"]
+    config.aspect_ratio = doc_dict["config"]["aspect_ratio"]
+    config.system_prompt = doc_dict["config"]["system_prompt"]
+    config.neg_prompts = doc_dict["config"]["neg_prompts"]
+    config.sub_prompts = doc_dict["config"]["sub_prompts"]
+    config.face_swap_image = doc_dict["config"]["face_swap_image"]
+    config.pose_image = doc_dict["config"]["pose_image"]
+    config.loop_count = doc_dict["config"]["loop_count"]
+    config.seed_generation = doc_dict["config"]["seed_generation"]
+    config.output_path = pathlib.Path(doc_dict["config"]["output_path"])
+    return config
+
+
+def load_toml_config(config_path: pathlib.Path) -> Config:
+    with open(config_path, "r") as f:
+        doc: TOMLDocument = loads(f.read())
+    doc_dict: dict[str, Any] = doc.value
+    config: Config = Config()
+    config.comfyui_path = pathlib.Path(
+        doc_dict["config"]["comfyui_path"]
+    ).expanduser()
+    if not os.path.isdir(config.comfyui_path):
+        raise ValueError(f"ComfyUI directory not found: {config.comfyui_path}")
+    input_path: pathlib.Path = config.comfyui_path / "input"
+    venv_path: str = doc_dict["config"].get("venv_path", DEFAULT_VENV_PATH)
+    config.venv_path = config.comfyui_path / venv_path
+    if not os.path.isdir(config.venv_path):
+        raise ValueError(f"Environment directory not found: {venv_path}")
+    ckpt: str = doc_dict["config"]["ckpt_path"]
+    ckpt_path: pathlib.Path = (
+        config.comfyui_path / MODEL_DIRECTORY / CHECKPOINT_DIRECTORY / ckpt
+    ).expanduser()
+    if not os.path.isfile(ckpt_path):
+        raise ValueError(f"Checkpoint file not found: {ckpt_path}")
+    config.ckpt = ckpt
+    lora: str = doc_dict["config"]["lora_path"]
+    lora_path: pathlib.Path = (
+        config.comfyui_path / MODEL_DIRECTORY / LORA_DIRECTORY / lora
+    ).expanduser()
+    if not os.path.isfile(lora_path):
+        raise ValueError(f"Lora file not found: {lora_path}")
+    config.lora = lora
+    controlnet: str = doc_dict["config"]["controlnet_path"]
+    controlnet_path: pathlib.Path = (
+        config.comfyui_path
+        / MODEL_DIRECTORY
+        / CONTROLNET_DIRECTORY
+        / controlnet
+    ).expanduser()
+    if not os.path.isfile(controlnet_path):
+        raise ValueError(f"Controlnet file not found: {controlnet_path}")
+    config.controlnet = controlnet
+    config.disable_controlnet = doc_dict["config"].get(
+        "disable_controlnet", DEFAULT_DISABLE_CONTROLNET
+    )
+    config.steps = doc_dict["config"].get("steps", DEFAULT_STEPS)
+    seed: int | None = doc_dict["config"].get("seed")
+    if seed is None:
+        seed = random.randint(1, 2**64)
+    config.seed = seed
+    config.guidance_scale = doc_dict["config"].get(
+        "guidance_scale", DEFAULT_GUIDANCE_SCALE
+    )
+    config.batch = doc_dict["config"].get("batch", DEFAULT_BATCH)
+    config.lora_strength = doc_dict["config"].get(
+        "lora_strength", DEFAULT_LORA_STRENGTH
+    )
+    config.width = doc_dict["config"].get("width", DEFAULT_WIDTH)
+    aspect_ratio: str = doc_dict["config"].get(
+        "aspect_ratio", DEFAULT_ASPECT_RATIO
+    )
+    config.height = int(config.width * ASPECT_RATIO[aspect_ratio])
+    config.system_prompt = doc_dict["config"]["system_prompt"]
+    config.neg_prompts = doc_dict["config"]["neg_prompts"]
+    config.sub_prompts = doc_dict["config"]["sub_prompts"]
+    face_swap_image_path: pathlib.Path = pathlib.Path(
+        doc_dict["config"]["face_swap_image_path"]
+    ).expanduser()
+    if not os.path.isfile(face_swap_image_path):
+        raise ValueError(
+            f"Face swap image file not found: {face_swap_image_path}"
+        )
+    shutil.copyfile(
+        face_swap_image_path, input_path / face_swap_image_path.name
+    )
+    config.face_swap_image = face_swap_image_path.name
+    pose_image_path: pathlib.Path = pathlib.Path(
+        doc_dict["config"]["pose_image_path"]
+    ).expanduser()
+    if not os.path.isfile(pose_image_path):
+        raise ValueError(f"Pose image file not found: {pose_image_path}")
+    shutil.copyfile(pose_image_path, input_path / pose_image_path.name)
+    config.pose_image = pose_image_path.name
+    config.loop_count = doc_dict["config"].get(
+        "loop_count", DEFAULT_LOOP_COUNT
+    )
+    config.seed_generation = SeedGenerationMethod(
+        doc_dict["config"]["seed_generation"]
+    )
+    config.output_path = pathlib.Path(
+        doc_dict["config"].get("output_path", "")
+    )
     return config

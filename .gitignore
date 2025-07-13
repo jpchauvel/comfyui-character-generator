@@ -208,4 +208,10 @@ system_prompt.txt
 neg_prompts.txt
 sub_prompts.txt
 
+# output directory
+output
+
+# TOML config file
+config.toml
+
 # End of https://www.toptal.com/developers/gitignore/api/python,macos
