@@ -30,7 +30,9 @@ def get_value_at_index(obj: Union[Sequence, Mapping], index: int) -> Any:
         return obj["result"][index]
 
 
-def add_comfyui_directory_to_sys_path(comfyui_path: pathlib.Path | None) -> None:
+def add_comfyui_directory_to_sys_path(
+    comfyui_path: pathlib.Path | None,
+) -> None:
     """
     Add 'ComfyUI' to the sys.path
     """
@@ -97,7 +99,7 @@ def main() -> None:
 
     from nodes import NODE_CLASS_MAPPINGS
 
-    def _generate() -> None:
+    def generate() -> None:
         import_custom_nodes()
         with torch.inference_mode():
             emptylatentimage = NODE_CLASS_MAPPINGS["EmptyLatentImage"]()
@@ -322,12 +324,14 @@ def main() -> None:
                     )
                 )
 
+                if manager.config.output_path != "":
+                    saveimage.output_dir = str(manager.config.output_path)
                 saveimage_59 = saveimage.save_images(
                     filename_prefix="ComfyUI",
                     images=get_value_at_index(reactorfaceswap_57, 0),
                 )
 
-    _generate()
+    generate()
 
 
 if __name__ == "__main__":

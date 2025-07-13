@@ -1,11 +1,11 @@
 import argparse
-from enum import IntEnum, auto
 import os
 import pathlib
 import random
 import shutil
 import sys
 from dataclasses import dataclass, field
+from enum import IntEnum, auto
 from typing import Any
 
 from tomlkit import TOMLDocument, document, dumps, loads, table
@@ -40,7 +40,9 @@ DEFAULT_LORA_STRENGTH: float = 1.5
 DEFAULT_WIDTH: int = 1024
 DEFAULT_ASPECT_RATIO: str = "1:1"
 DEFAULT_LOOP_COUNT: int = 1
-DEFAULT_SEED_GENERATION: int = SeedGenerationMethod.INCREMENT  # 0: Increment, 1: Decrement, 2: Random
+DEFAULT_SEED_GENERATION: SeedGenerationMethod = (
+    SeedGenerationMethod.INCREMENT
+)  # 0: Increment, 1: Decrement, 2: Random
 
 
 def get_args() -> argparse.Namespace:
@@ -161,6 +163,12 @@ def get_args() -> argparse.Namespace:
         default=DEFAULT_SEED_GENERATION,
         help="Seed generation method (0: Increment, 1: Decrement, 2: Random).",
     )
+    parser.add_argument(
+        "--output_path",
+        type=str,
+        default="",
+        help="Path to output directory.",
+    )
     return parser.parse_known_args(sys.argv)[0]
 
 
@@ -186,6 +194,7 @@ class Config:
     pose_image: str | None = None
     loop_count: int = DEFAULT_LOOP_COUNT
     seed_generation: SeedGenerationMethod = DEFAULT_SEED_GENERATION
+    output_path: pathlib.Path | None = None
 
     def __init__(self) -> None:
         super().__init__()
@@ -207,13 +216,17 @@ class Config:
 
 def add_with_rotate_64(a, b) -> int:
     full_sum: int = a + b
-    base: int = full_sum & 0xFFFFFFFFFFFFFFFF # Normal 64-bit truncation
+    base: int = full_sum & 0xFFFFFFFFFFFFFFFF  # Normal 64-bit truncation
 
     # Number of bits overflowed (max possible: up to 64)
-    overflow_bit_count: int = full_sum.bit_length() - 64 if full_sum.bit_length() > 64 else 0
+    overflow_bit_count: int = (
+        full_sum.bit_length() - 64 if full_sum.bit_length() > 64 else 0
+    )
 
     # Rotate-left base by number of overflow bits
-    rotated: int = ((base << overflow_bit_count) | (base >> (64 - overflow_bit_count))) & 0xFFFFFFFFFFFFFFFF
+    rotated: int = (
+        (base << overflow_bit_count) | (base >> (64 - overflow_bit_count))
+    ) & 0xFFFFFFFFFFFFFFFF
     return rotated
 
 
@@ -234,7 +247,10 @@ def sub_with_rotate_64(a, b) -> int:
         overflow_bit_count: int = borrow.bit_length()
 
         # Rotate right the wrapped result by number of overflow bits
-        rotated: int = ((wrapped >> overflow_bit_count) | (wrapped << (64 - overflow_bit_count))) & 0xFFFFFFFFFFFFFFFF
+        rotated: int = (
+            (wrapped >> overflow_bit_count)
+            | (wrapped << (64 - overflow_bit_count))
+        ) & 0xFFFFFFFFFFFFFFFF
         return rotated
 
 
@@ -242,15 +258,15 @@ class AppManager:
     def __init__(self, toml_data: str | None = None) -> None:
         self._input = None
         if toml_data is not None:
-            self._args = None
             self._config = load_toml(toml_data)
+            self._args = None
             self._chdir()
         else:
             self._config = Config()
             self._args = get_args()
-            self._set_properties_from_args()
+            self._set_config_from_args()
 
-    def _set_properties_from_args(self) -> None:
+    def _set_config_from_args(self) -> None:
         if self._args is None:
             return
         self._set_comfyui_path()
@@ -271,7 +287,10 @@ class AppManager:
         self._set_face_swap_image()
         self._set_pose_image()
         self.config.loop_count = self._args.loop_count
-        self.config.seed_generation = SeedGenerationMethod(self._args.seed_generation)
+        self.config.seed_generation = SeedGenerationMethod(
+            self._args.seed_generation
+        )
+        self.config.output_path = self._args.output_path
 
     def _set_comfyui_path(self) -> None:
         if self._args is None:
@@ -412,10 +431,17 @@ class AppManager:
             case SeedGenerationMethod.RANDOM:
                 return random.randint(1, 2**64)
 
-
     @property
     def config(self) -> Config:
         return self._config
+
+    @property
+    def basedir(self) -> pathlib.Path:
+        return pathlib.Path(__file__).parent
+
+    @property
+    def pythonpath(self) -> pathlib.Path:
+        return self.basedir.parent
 
 
 def dump_toml(manager: AppManager) -> str:
@@ -441,6 +467,7 @@ def dump_toml(manager: AppManager) -> str:
     doc_manager.add("pose_image", manager.config.pose_image)
     doc_manager.add("loop_count", manager.config.loop_count)
     doc_manager.add("seed_generation", manager.config.seed_generation)
+    doc_manager.append("output_path", manager.config.output_path)
     doc.add("manager", doc_manager)
     return dumps(doc)
 
@@ -469,4 +496,5 @@ def load_toml(toml_data: str) -> Config:
     config.pose_image = doc_dict["manager"]["pose_image"]
     config.loop_count = doc_dict["manager"]["loop_count"]
     config.seed_generation = doc_dict["manager"]["seed_generation"]
+    config.output_path = pathlib.Path(doc_dict["manager"]["output_path"])
     return config

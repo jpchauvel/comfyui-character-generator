@@ -7,21 +7,25 @@ from comfyui_character_generator.util import AppManager, dump_toml
 
 def main() -> None:
     manager: AppManager = AppManager()
-    basedir: pathlib.Path = pathlib.Path(__file__).parent
-    pythonpath: pathlib.Path = basedir.parent
+
     if manager.config.venv_path is None:
         raise ValueError("No venv path specified")
+
     for _ in range(manager.config.loop_count):
-        command: str = shlex.quote((basedir / "generate.sh").as_posix())
+        command: str = shlex.quote(
+            (manager.basedir / "generate.sh").as_posix()
+        )
         args: tuple[str, ...] = (
             shlex.quote(manager.config.venv_path.as_posix()),
-            shlex.quote(pythonpath.as_posix()),
+            shlex.quote(manager.pythonpath.as_posix()),
         )
+
         subprocess.run(
             [command, *args],
             input=dump_toml(manager).encode("utf-8"),
             shell=False,
         )
+
         manager.config.seed = manager.generate_new_seed()
 
 
