@@ -1,0 +1,31 @@
+[project]
+name = "comfyui-character-generator"
+version = "0.1.0"
+description = "Automated ComfyUI character generator"
+readme = "README.md"
+authors = [
+    { name = "Jean-Pierre Chauvel", email = "jean.p.chauvel@gmail.com" }
+]
+requires-python = ">=3.12, <3.13"
+dependencies = [
+    "tomlkit>=0.13.3",
+]
+
+[dependency-groups]
+dev = [
+    "black>=25.1.0",
+    "isort>=6.0.1",
+]
+
+[project.scripts]
+comfyui-character-generator = "comfyui_character_generator.main:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "src/comfyui_character_generator/__about__.py"
+
+[tool.black]
+line-length = 79
