@@ -326,7 +326,9 @@ def main() -> None:
 
                 if manager.config.output_path != pathlib.Path(""):
                     print(f"Output dir: {manager.config.output_path}")
-                    saveimage.output_dir = manager.config.output_path.expanduser().as_posix()
+                    saveimage.output_dir = (
+                        manager.config.output_path.expanduser().as_posix()
+                    )
                 saveimage_59 = saveimage.save_images(
                     filename_prefix="ComfyUI",
                     images=get_value_at_index(reactorfaceswap_57, 0),

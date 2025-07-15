@@ -29,8 +29,3 @@ uvx --from git+https://github.com/jpchauvel/comfyui-character-generator comfyui-
 ```
 
 It will prompt with all the necessary information.
-
-NOTE: You have to install `tomlkit` in ComfyUI:
-
-Go to the `comfyui` directory and run `pip install tomlkit`
-

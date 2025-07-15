@@ -1,8 +1,7 @@
-import pathlib
 import shlex
 import subprocess
 
-from comfyui_character_generator.util import AppManager, dump_toml
+from comfyui_character_generator.util import AppManager, dump_json
 
 
 def main() -> None:
@@ -22,7 +21,7 @@ def main() -> None:
 
         subprocess.run(
             [command, *args],
-            input=dump_toml(manager).encode("utf-8"),
+            input=dump_json(manager).encode("utf-8"),
             shell=False,
         )
 

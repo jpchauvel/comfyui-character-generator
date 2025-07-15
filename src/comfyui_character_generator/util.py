@@ -1,15 +1,14 @@
 import argparse
+import json
 import os
 import pathlib
 import random
 import shutil
 import sys
+import tomllib
 from dataclasses import dataclass, field
 from enum import IntEnum, auto
 from typing import Any
-
-from tomlkit import TOMLDocument, document, dumps, loads, table
-from tomlkit.items import Table
 
 ASPECT_RATIO: dict[str, float] = {
     "1:1": 1.0,
@@ -262,10 +261,10 @@ def sub_with_rotate_64(a, b) -> int:
 
 
 class AppManager:
-    def __init__(self, toml_data: str | None = None) -> None:
+    def __init__(self, json_data: str | None = None) -> None:
         self._input = None
-        if toml_data is not None:
-            self._config = load_toml(toml_data)
+        if json_data is not None:
+            self._config = load_json(json_data)
             self._args = None
             self._chdir()
         else:
@@ -472,72 +471,67 @@ class AppManager:
         return self.basedir.parent
 
 
-def dump_toml(manager: AppManager) -> str:
-    doc: TOMLDocument = document()
-    doc_config: Table = table()
-    doc_config.add("comfyui_path", str(manager.config.comfyui_path))
-    doc_config.add("venv_path", str(manager.config.venv_path))
-    doc_config.add("ckpt", manager.config.ckpt)
-    doc_config.add("lora", manager.config.lora)
-    doc_config.add("controlnet", manager.config.controlnet)
-    doc_config.add("disable_controlnet", manager.config.disable_controlnet)
-    doc_config.add("steps", manager.config.steps)
-    doc_config.add("seed", manager.config.seed)
-    doc_config.add("guidance_scale", manager.config.guidance_scale)
-    doc_config.add("lora_strength", manager.config.lora_strength)
-    doc_config.add("batch", manager.config.batch)
-    doc_config.add("width", manager.config.width)
-    doc_config.add("height", manager.config.height)
-    doc_config.add("aspect_ratio", manager.config.aspect_ratio)
-    doc_config.add("system_prompt", manager.config.system_prompt)
-    doc_config.add("neg_prompts", manager.config.neg_prompts)
-    doc_config.add("sub_prompts", manager.config.sub_prompts)
-    doc_config.add("face_swap_image", manager.config.face_swap_image)
-    doc_config.add("pose_image", manager.config.pose_image)
-    doc_config.add("loop_count", manager.config.loop_count)
-    doc_config.add("seed_generation", manager.config.seed_generation)
-    doc_config.add("output_path", str(manager.config.output_path))
-    doc.add("config", doc_config)
-    return dumps(doc)
+def dump_json(manager: AppManager) -> str:
+    config_dict: dict[str, Any] = {
+        "comfyui_path": str(manager.config.comfyui_path),
+        "venv_path": str(manager.config.venv_path),
+        "ckpt": manager.config.ckpt,
+        "lora": manager.config.lora,
+        "controlnet": manager.config.controlnet,
+        "disable_controlnet": manager.config.disable_controlnet,
+        "steps": manager.config.steps,
+        "seed": manager.config.seed,
+        "guidance_scale": manager.config.guidance_scale,
+        "lora_strength": manager.config.lora_strength,
+        "batch": manager.config.batch,
+        "width": manager.config.width,
+        "height": manager.config.height,
+        "aspect_ratio": manager.config.aspect_ratio,
+        "system_prompt": manager.config.system_prompt,
+        "neg_prompts": manager.config.neg_prompts,
+        "sub_prompts": manager.config.sub_prompts,
+        "face_swap_image": manager.config.face_swap_image,
+        "pose_image": manager.config.pose_image,
+        "loop_count": manager.config.loop_count,
+        "seed_generation": manager.config.seed_generation,
+        "output_path": str(manager.config.output_path),
+    }
+    return json.dumps(config_dict)
 
 
-def load_toml(toml_data: str) -> Config:
-    doc: TOMLDocument = loads(toml_data)
-    doc_dict: dict[str, Any] = doc.value
+def load_json(json_data: str) -> Config:
+    config_dict: dict[str, Any] = json.loads(json_data)
     config: Config = Config()
     config.comfyui_path = pathlib.Path(
-        doc_dict["config"]["comfyui_path"]
+        config_dict["comfyui_path"]
     ).expanduser()
-    config.venv_path = pathlib.Path(
-        doc_dict["config"]["venv_path"]
-    ).expanduser()
-    config.ckpt = doc_dict["config"]["ckpt"]
-    config.lora = doc_dict["config"]["lora"]
-    config.controlnet = doc_dict["config"]["controlnet"]
-    config.disable_controlnet = doc_dict["config"]["disable_controlnet"]
-    config.steps = doc_dict["config"]["steps"]
-    config.seed = doc_dict["config"]["seed"]
-    config.guidance_scale = doc_dict["config"]["guidance_scale"]
-    config.batch = doc_dict["config"]["batch"]
-    config.lora_strength = doc_dict["config"]["lora_strength"]
-    config.width = doc_dict["config"]["width"]
-    config.height = doc_dict["config"]["height"]
-    config.aspect_ratio = doc_dict["config"]["aspect_ratio"]
-    config.system_prompt = doc_dict["config"]["system_prompt"]
-    config.neg_prompts = doc_dict["config"]["neg_prompts"]
-    config.sub_prompts = doc_dict["config"]["sub_prompts"]
-    config.face_swap_image = doc_dict["config"]["face_swap_image"]
-    config.pose_image = doc_dict["config"]["pose_image"]
-    config.loop_count = doc_dict["config"]["loop_count"]
-    config.seed_generation = doc_dict["config"]["seed_generation"]
-    config.output_path = pathlib.Path(doc_dict["config"]["output_path"])
+    config.venv_path = pathlib.Path(config_dict["venv_path"]).expanduser()
+    config.ckpt = config_dict["ckpt"]
+    config.lora = config_dict["lora"]
+    config.controlnet = config_dict["controlnet"]
+    config.disable_controlnet = config_dict["disable_controlnet"]
+    config.steps = config_dict["steps"]
+    config.seed = config_dict["seed"]
+    config.guidance_scale = config_dict["guidance_scale"]
+    config.batch = config_dict["batch"]
+    config.lora_strength = config_dict["lora_strength"]
+    config.width = config_dict["width"]
+    config.height = config_dict["height"]
+    config.aspect_ratio = config_dict["aspect_ratio"]
+    config.system_prompt = config_dict["system_prompt"]
+    config.neg_prompts = config_dict["neg_prompts"]
+    config.sub_prompts = config_dict["sub_prompts"]
+    config.face_swap_image = config_dict["face_swap_image"]
+    config.pose_image = config_dict["pose_image"]
+    config.loop_count = config_dict["loop_count"]
+    config.seed_generation = config_dict["seed_generation"]
+    config.output_path = pathlib.Path(config_dict["output_path"])
     return config
 
 
 def load_toml_config(config_path: pathlib.Path) -> Config:
-    with open(config_path, "r") as f:
-        doc: TOMLDocument = loads(f.read())
-    doc_dict: dict[str, Any] = doc.value
+    with open(config_path, "rb") as fd:
+        doc_dict: dict[str, Any] = tomllib.load(fd)
     config: Config = Config()
     config.comfyui_path = pathlib.Path(
         doc_dict["config"]["comfyui_path"]
