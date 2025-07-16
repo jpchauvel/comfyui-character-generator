@@ -6,9 +6,9 @@ import random
 import shutil
 import sys
 import tomllib
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from enum import IntEnum, auto
-from typing import Any
+from typing import Any, Self
 
 ASPECT_RATIO: dict[str, float] = {
     "1:1": 1.0,
@@ -35,7 +35,6 @@ DEFAULT_STEPS: int = 35
 SEED: int = random.randint(1, 2**64)
 DEFAULT_GUIDANCE_SCALE: float = 8.0
 DEFAULT_BATCH: int = 1
-DEFAULT_LORA_STRENGTH: float = 1.5
 DEFAULT_WIDTH: int = 1024
 DEFAULT_ASPECT_RATIO: str = "1:1"
 DEFAULT_LOOP_COUNT: int = 1
@@ -72,10 +71,11 @@ def get_args() -> argparse.Namespace:
         help="Single .safetensors checkpoint file. Relative to checkpoint directory.",
     )
     parser.add_argument(
-        "--lora_path",
+        "--lora_paths",
+        nargs="*",
         type=str,
-        default=None,
-        help="Path to character LoRA .safetensors file. Relative to lora directory.",
+        default=[],
+        help="Paths to .safetensors files. Relative to lora directory.",
     )
     parser.add_argument(
         "--controlnet_path",
@@ -113,10 +113,11 @@ def get_args() -> argparse.Namespace:
         help=f"Images *per* prompt (default {DEFAULT_BATCH}).",
     )
     parser.add_argument(
-        "--lora_strength",
+        "--lora_strengths",
+        nargs="*",
         type=float,
-        default=DEFAULT_LORA_STRENGTH,
-        help=f"Character LoRA strength (default {DEFAULT_LORA_STRENGTH}).",
+        default=[],
+        help="LoRA strengths. If provided should match the number of --lora_paths.",
     )
     parser.add_argument(
         "--width",
@@ -177,19 +178,19 @@ def get_args() -> argparse.Namespace:
     return parser.parse_known_args(sys.argv)[0]
 
 
-@dataclass()
+@dataclass
 class Config:
     comfyui_path: pathlib.Path | None = None
     venv_path: pathlib.Path | None = None
     ckpt: str | None = None
-    lora: str | None = None
+    loras: list[str] = field(default_factory=list)
     controlnet: str | None = None
     disable_controlnet: bool = DEFAULT_DISABLE_CONTROLNET
     steps: int = DEFAULT_STEPS
     seed: int = SEED
     guidance_scale: float = DEFAULT_GUIDANCE_SCALE
     batch: int = DEFAULT_BATCH
-    lora_strength: float = DEFAULT_LORA_STRENGTH
+    lora_strengths: list[float] = field(default_factory=list)
     width: int = DEFAULT_WIDTH
     height: int = int(DEFAULT_WIDTH * ASPECT_RATIO[DEFAULT_ASPECT_RATIO])
     aspect_ratio: str = DEFAULT_ASPECT_RATIO
@@ -202,8 +203,9 @@ class Config:
     seed_generation: SeedGenerationMethod = DEFAULT_SEED_GENERATION
     output_path: pathlib.Path = pathlib.Path("")
 
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(self, **attrs) -> None:
+        for attr in attrs:
+            setattr(self, attr, attrs[attr])
         self._neg_prompt_iter = None
         self._sub_prompt_iter = None
 
@@ -218,6 +220,36 @@ class Config:
         if self._sub_prompt_iter is None:
             self._sub_prompt_iter = iter(self.sub_prompts)
         return next(self._sub_prompt_iter, "")
+
+    @property
+    def next_lora_and_stregnth(self) -> tuple[str, float]:
+        return next(zip(self.loras, self.lora_strengths), ("", 0.0))
+
+    @staticmethod
+    def dict_factory(pairs: dict[str, Any] | Any) -> dict[str, Any] | Any:
+        if isinstance(pairs, pathlib.Path):
+            return pairs.as_posix()
+        converted: dict[str, Any] = {}
+        for key, value in pairs.items():
+            if isinstance(value, pathlib.Path):
+                converted[key] = value.as_posix()
+            else:
+                converted[key] = value
+        return converted
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Self:
+        for key, value in data.items():
+            if key in ("comfyui_path", "venv_path", "output_path"):
+                data[key] = pathlib.Path(value)
+        return cls(**data)
+
+    def dump(self) -> str:
+        return json.dumps(asdict(self), default=self.dict_factory)
+
+    @classmethod
+    def load(cls, data: str) -> Self:
+        return cls.from_dict(json.loads(data))
 
 
 def add_with_rotate_64(a, b) -> int:
@@ -261,10 +293,10 @@ def sub_with_rotate_64(a, b) -> int:
 
 
 class AppManager:
-    def __init__(self, json_data: str | None = None) -> None:
+    def __init__(self, data: str | None = None) -> None:
         self._input = None
-        if json_data is not None:
-            self._config = load_json(json_data)
+        if data is not None:
+            self._config = Config.load(data)
             self._args = None
             self._chdir()
         else:
@@ -275,21 +307,23 @@ class AppManager:
             elif None not in (
                 self._args.comfyui_path,
                 self._args.ckpt_path,
-                self._args.lora_path,
+                self._args.lora_paths,
                 self._args.controlnet_path,
                 self._args.system_prompt_path,
                 self._args.neg_prompts_path,
                 self._args.sub_prompts_path,
                 self._args.face_swap_image_path,
                 self._args.pose_image_path,
+                self._args.lora_strengths,
             ):
                 self._set_config_from_args()
             else:
                 raise ValueError(
                     "All of the following must be provided: "
-                    "--comfyui_path, --ckpt_path, --lora_path, "
+                    "--comfyui_path, --ckpt_path, --lora_paths, "
                     "--controlnet_path, --system_prompt_path, --neg_prompts_path, "
-                    "--sub_prompts_path, --face_swap_image_path, --pose_image_path"
+                    "--sub_prompts_path, --face_swap_image_path, --pose_image_path, "
+                    "--lora_strengths"
                 )
 
     def _set_config_from_args(self) -> None:
@@ -298,14 +332,13 @@ class AppManager:
         self._set_comfyui_path()
         self._set_venv()
         self._set_ckpt()
-        self._set_lora()
+        self._set_loras_and_strengths()
         self._set_controlnet()
         self.config.disable_controlnet = self._args.disable_controlnet
         self.config.steps = self._args.steps
         self.config.seed = self._args.seed
         self.config.guidance_scale = self._args.guidance_scale
         self.config.batch = self._args.batch
-        self.config.lora_strength = self._args.lora_strength
         self._set_resolution()
         self.config.aspect_ratio = self._args.aspect_ratio
         self._set_system_prompt()
@@ -357,18 +390,24 @@ class AppManager:
             raise ValueError(f"Checkpoint file not found: {ckpt_path}")
         self.config.ckpt = self._args.ckpt_path
 
-    def _set_lora(self) -> None:
+    def _set_loras_and_strengths(self) -> None:
         if self._args is None or self.config.comfyui_path is None:
             return
-        lora_path: pathlib.Path = (
-            self.config.comfyui_path
-            / MODEL_DIRECTORY
-            / LORA_DIRECTORY
-            / self._args.lora_path
-        ).expanduser()
-        if not os.path.isfile(lora_path):
-            raise ValueError(f"Lora file not found: {lora_path}")
-        self.config.lora = self._args.lora_path
+        if len(self._args.lora_paths) != len(self._args.lora_strengths):
+            raise ValueError(
+                "Number of loras and lora strengths must be the same"
+            )
+        for lora_path in self._args.lora_paths:
+            lora_path = (
+                self.config.comfyui_path
+                / MODEL_DIRECTORY
+                / LORA_DIRECTORY
+                / lora_path
+            ).expanduser()
+            if not os.path.isfile(lora_path):
+                raise ValueError(f"Lora file not found: {lora_path}")
+        self.config.loras = self._args.lora_paths
+        self.config.lora_strengths = self._args.lora_strengths
 
     def _set_controlnet(self) -> None:
         if self._args is None or self.config.comfyui_path is None:
@@ -471,64 +510,6 @@ class AppManager:
         return self.basedir.parent
 
 
-def dump_json(manager: AppManager) -> str:
-    config_dict: dict[str, Any] = {
-        "comfyui_path": str(manager.config.comfyui_path),
-        "venv_path": str(manager.config.venv_path),
-        "ckpt": manager.config.ckpt,
-        "lora": manager.config.lora,
-        "controlnet": manager.config.controlnet,
-        "disable_controlnet": manager.config.disable_controlnet,
-        "steps": manager.config.steps,
-        "seed": manager.config.seed,
-        "guidance_scale": manager.config.guidance_scale,
-        "lora_strength": manager.config.lora_strength,
-        "batch": manager.config.batch,
-        "width": manager.config.width,
-        "height": manager.config.height,
-        "aspect_ratio": manager.config.aspect_ratio,
-        "system_prompt": manager.config.system_prompt,
-        "neg_prompts": manager.config.neg_prompts,
-        "sub_prompts": manager.config.sub_prompts,
-        "face_swap_image": manager.config.face_swap_image,
-        "pose_image": manager.config.pose_image,
-        "loop_count": manager.config.loop_count,
-        "seed_generation": manager.config.seed_generation,
-        "output_path": str(manager.config.output_path),
-    }
-    return json.dumps(config_dict)
-
-
-def load_json(json_data: str) -> Config:
-    config_dict: dict[str, Any] = json.loads(json_data)
-    config: Config = Config()
-    config.comfyui_path = pathlib.Path(
-        config_dict["comfyui_path"]
-    ).expanduser()
-    config.venv_path = pathlib.Path(config_dict["venv_path"]).expanduser()
-    config.ckpt = config_dict["ckpt"]
-    config.lora = config_dict["lora"]
-    config.controlnet = config_dict["controlnet"]
-    config.disable_controlnet = config_dict["disable_controlnet"]
-    config.steps = config_dict["steps"]
-    config.seed = config_dict["seed"]
-    config.guidance_scale = config_dict["guidance_scale"]
-    config.batch = config_dict["batch"]
-    config.lora_strength = config_dict["lora_strength"]
-    config.width = config_dict["width"]
-    config.height = config_dict["height"]
-    config.aspect_ratio = config_dict["aspect_ratio"]
-    config.system_prompt = config_dict["system_prompt"]
-    config.neg_prompts = config_dict["neg_prompts"]
-    config.sub_prompts = config_dict["sub_prompts"]
-    config.face_swap_image = config_dict["face_swap_image"]
-    config.pose_image = config_dict["pose_image"]
-    config.loop_count = config_dict["loop_count"]
-    config.seed_generation = config_dict["seed_generation"]
-    config.output_path = pathlib.Path(config_dict["output_path"])
-    return config
-
-
 def load_toml_config(config_path: pathlib.Path) -> Config:
     with open(config_path, "rb") as fd:
         doc_dict: dict[str, Any] = tomllib.load(fd)
@@ -550,13 +531,18 @@ def load_toml_config(config_path: pathlib.Path) -> Config:
     if not os.path.isfile(ckpt_path):
         raise ValueError(f"Checkpoint file not found: {ckpt_path}")
     config.ckpt = ckpt
-    lora: str = doc_dict["config"]["lora_path"]
-    lora_path: pathlib.Path = (
-        config.comfyui_path / MODEL_DIRECTORY / LORA_DIRECTORY / lora
-    ).expanduser()
-    if not os.path.isfile(lora_path):
-        raise ValueError(f"Lora file not found: {lora_path}")
-    config.lora = lora
+    loras: list[str] = doc_dict["config"]["lora_paths"]
+    lora_strengths: list[float] = doc_dict["config"]["lora_strengths"]
+    if len(loras) != len(lora_strengths):
+        raise ValueError("Number of loras and lora strengths must be the same")
+    for lora in loras:
+        lora_path = (
+            config.comfyui_path / MODEL_DIRECTORY / LORA_DIRECTORY / lora
+        ).expanduser()
+        if not os.path.isfile(lora_path):
+            raise ValueError(f"Lora file not found: {lora_path}")
+    config.loras = loras
+    config.lora_strengths = lora_strengths
     controlnet: str = doc_dict["config"]["controlnet_path"]
     controlnet_path: pathlib.Path = (
         config.comfyui_path
@@ -579,9 +565,6 @@ def load_toml_config(config_path: pathlib.Path) -> Config:
         "guidance_scale", DEFAULT_GUIDANCE_SCALE
     )
     config.batch = doc_dict["config"].get("batch", DEFAULT_BATCH)
-    config.lora_strength = doc_dict["config"].get(
-        "lora_strength", DEFAULT_LORA_STRENGTH
-    )
     config.width = doc_dict["config"].get("width", DEFAULT_WIDTH)
     aspect_ratio: str = doc_dict["config"].get(
         "aspect_ratio", DEFAULT_ASPECT_RATIO

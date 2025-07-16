@@ -1,7 +1,7 @@
 import shlex
 import subprocess
 
-from comfyui_character_generator.util import AppManager, dump_json
+from comfyui_character_generator.util import AppManager
 
 
 def main() -> None:
@@ -21,7 +21,7 @@ def main() -> None:
 
         subprocess.run(
             [command, *args],
-            input=dump_json(manager).encode("utf-8"),
+            input=manager.config.dump().encode("utf-8"),
             shell=False,
         )
 

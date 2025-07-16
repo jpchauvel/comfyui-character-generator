@@ -117,48 +117,69 @@ def main() -> None:
             )
 
             loraloader = NODE_CLASS_MAPPINGS["LoraLoader"]()
-            loraloader_10 = loraloader.load_lora(
-                lora_name=manager.config.lora,
-                strength_model=manager.config.lora_strength,
-                strength_clip=manager.config.lora_strength,
-                model=get_value_at_index(checkpointloadersimple_12, 0),
-                clip=get_value_at_index(checkpointloadersimple_12, 1),
-            )
+            loraloaders: list[Any] = []
+            for idx, lora in enumerate(manager.config.loras):
+                if idx == 0:
+                    loraloaders.append(
+                        loraloader.load_lora(
+                            lora_name=lora,
+                            strength_model=manager.config.lora_strengths[idx],
+                            strength_clip=manager.config.lora_strengths[idx],
+                            model=get_value_at_index(
+                                checkpointloadersimple_12, 0
+                            ),
+                            clip=get_value_at_index(
+                                checkpointloadersimple_12, 1
+                            ),
+                        )
+                    )
+                else:
+                    loraloaders.append(
+                        loraloader.load_lora(
+                            lora_name=lora,
+                            strength_model=manager.config.lora_strengths[idx],
+                            strength_clip=manager.config.lora_strengths[idx],
+                            model=get_value_at_index(loraloaders[idx - 1], 0),
+                            clip=get_value_at_index(loraloaders[idx - 1], 1),
+                        )
+                    )
+
+            last_lora: Any = loraloaders[-1]
 
             cliptextencode = NODE_CLASS_MAPPINGS["CLIPTextEncode"]()
             cliptextencode_6 = cliptextencode.encode(
                 text=manager.config.system_prompt,
-                clip=get_value_at_index(loraloader_10, 1),
+                clip=get_value_at_index(last_lora, 1),
             )
 
             cliptextencode_15 = cliptextencode.encode(
                 text=manager.config.next_sub_prompt,
-                clip=get_value_at_index(loraloader_10, 1),
+                clip=get_value_at_index(last_lora, 1),
             )
 
             cliptextencode_24 = cliptextencode.encode(
                 text=manager.config.next_sub_prompt,
-                clip=get_value_at_index(loraloader_10, 1),
+                clip=get_value_at_index(last_lora, 1),
             )
 
             cliptextencode_26 = cliptextencode.encode(
                 text=manager.config.next_sub_prompt,
-                clip=get_value_at_index(loraloader_10, 1),
+                clip=get_value_at_index(last_lora, 1),
             )
 
             cliptextencode_28 = cliptextencode.encode(
                 text=manager.config.next_sub_prompt,
-                clip=get_value_at_index(loraloader_10, 1),
+                clip=get_value_at_index(last_lora, 1),
             )
 
             cliptextencode_7 = cliptextencode.encode(
                 text=manager.config.next_neg_prompt,
-                clip=get_value_at_index(loraloader_10, 1),
+                clip=get_value_at_index(last_lora, 1),
             )
 
             cliptextencode_31 = cliptextencode.encode(
                 text=manager.config.next_neg_prompt,
-                clip=get_value_at_index(loraloader_10, 1),
+                clip=get_value_at_index(last_lora, 1),
             )
 
             controlnetloader = NODE_CLASS_MAPPINGS["ControlNetLoader"]()
@@ -193,146 +214,136 @@ def main() -> None:
             ]()
             saveimage = NODE_CLASS_MAPPINGS["SaveImage"]()
 
-            for q in range(1):
-                conditioningconcat_18 = conditioningconcat.concat(
-                    conditioning_to=get_value_at_index(cliptextencode_6, 0),
-                    conditioning_from=get_value_at_index(cliptextencode_15, 0),
-                )
+            conditioningconcat_18 = conditioningconcat.concat(
+                conditioning_to=get_value_at_index(cliptextencode_6, 0),
+                conditioning_from=get_value_at_index(cliptextencode_15, 0),
+            )
 
-                conditioningconcat_27 = conditioningconcat.concat(
-                    conditioning_to=get_value_at_index(cliptextencode_28, 0),
-                    conditioning_from=get_value_at_index(cliptextencode_26, 0),
-                )
+            conditioningconcat_27 = conditioningconcat.concat(
+                conditioning_to=get_value_at_index(cliptextencode_28, 0),
+                conditioning_from=get_value_at_index(cliptextencode_26, 0),
+            )
 
-                conditioningconcat_30 = conditioningconcat.concat(
-                    conditioning_to=get_value_at_index(
-                        conditioningconcat_27, 0
-                    ),
-                    conditioning_from=get_value_at_index(cliptextencode_24, 0),
-                )
+            conditioningconcat_30 = conditioningconcat.concat(
+                conditioning_to=get_value_at_index(conditioningconcat_27, 0),
+                conditioning_from=get_value_at_index(cliptextencode_24, 0),
+            )
 
-                conditioningconcat_25 = conditioningconcat.concat(
-                    conditioning_to=get_value_at_index(
-                        conditioningconcat_18, 0
-                    ),
-                    conditioning_from=get_value_at_index(
-                        conditioningconcat_30, 0
-                    ),
-                )
+            conditioningconcat_25 = conditioningconcat.concat(
+                conditioning_to=get_value_at_index(conditioningconcat_18, 0),
+                conditioning_from=get_value_at_index(conditioningconcat_30, 0),
+            )
 
-                conditioningconcat_33 = conditioningconcat.concat(
-                    conditioning_to=get_value_at_index(cliptextencode_7, 0),
-                    conditioning_from=get_value_at_index(cliptextencode_31, 0),
-                )
+            conditioningconcat_33 = conditioningconcat.concat(
+                conditioning_to=get_value_at_index(cliptextencode_7, 0),
+                conditioning_from=get_value_at_index(cliptextencode_31, 0),
+            )
 
-                openposepreprocessor_54 = openposepreprocessor.estimate_pose(
-                    detect_hand="disable",
-                    detect_body="enable",
-                    detect_face="enable",
-                    resolution=512,
-                    scale_stick_for_xinsr_cn="disable",
-                    image=get_value_at_index(loadimage_51, 0),
-                )
+            openposepreprocessor_54 = openposepreprocessor.estimate_pose(
+                detect_hand="disable",
+                detect_body="enable",
+                detect_face="enable",
+                resolution=512,
+                scale_stick_for_xinsr_cn="disable",
+                image=get_value_at_index(loadimage_51, 0),
+            )
 
-                controlnetapplyadvanced_35 = (
-                    controlnetapplyadvanced.apply_controlnet(
-                        strength=0.6000000000000001,
-                        start_percent=0,
-                        end_percent=0.4000000000000001,
-                        positive=get_value_at_index(conditioningconcat_25, 0),
-                        negative=get_value_at_index(conditioningconcat_33, 0),
-                        control_net=get_value_at_index(controlnetloader_34, 0),
-                        image=get_value_at_index(openposepreprocessor_54, 0),
-                        vae=get_value_at_index(checkpointloadersimple_12, 2),
-                    )
-                )
-
-                impactswitch_62 = impactswitch.doit(
-                    select=1 if manager.config.disable_controlnet else 2,
-                    sel_mode=False,
-                    input1=get_value_at_index(conditioningconcat_25, 0),
-                    input2=get_value_at_index(controlnetapplyadvanced_35, 0),
-                    unique_id=62,
-                )
-
-                impactswitch_63 = impactswitch.doit(
-                    select=get_value_at_index(impactswitch_62, 2),
-                    sel_mode=False,
-                    input1=get_value_at_index(conditioningconcat_33, 0),
-                    input2=get_value_at_index(controlnetapplyadvanced_35, 1),
-                    unique_id=63,
-                )
-
-                ksampler_3 = ksampler.sample(
-                    seed=manager.config.seed,
-                    steps=manager.config.steps,
-                    cfg=manager.config.guidance_scale,
-                    sampler_name="euler",
-                    scheduler="normal",
-                    denoise=1,
-                    model=get_value_at_index(loraloader_10, 0),
-                    positive=get_value_at_index(impactswitch_62, 0),
-                    negative=get_value_at_index(impactswitch_63, 0),
-                    latent_image=get_value_at_index(emptylatentimage_5, 0),
-                )
-
-                vaedecode_8 = vaedecode.decode(
-                    samples=get_value_at_index(ksampler_3, 0),
+            controlnetapplyadvanced_35 = (
+                controlnetapplyadvanced.apply_controlnet(
+                    strength=0.6000000000000001,
+                    start_percent=0,
+                    end_percent=0.4000000000000001,
+                    positive=get_value_at_index(conditioningconcat_25, 0),
+                    negative=get_value_at_index(conditioningconcat_33, 0),
+                    control_net=get_value_at_index(controlnetloader_34, 0),
+                    image=get_value_at_index(openposepreprocessor_54, 0),
                     vae=get_value_at_index(checkpointloadersimple_12, 2),
                 )
+            )
 
-                easy_cleangpuused_43 = easy_cleangpuused.empty_cache(
-                    anything=get_value_at_index(loraloader_10, 0),
-                    unique_id=10755185619704895890,
-                )
+            impactswitch_62 = impactswitch.doit(
+                select=1 if manager.config.disable_controlnet else 2,
+                sel_mode=False,
+                input1=get_value_at_index(conditioningconcat_25, 0),
+                input2=get_value_at_index(controlnetapplyadvanced_35, 0),
+                unique_id=62,
+            )
 
-                easy_clearcacheall_44 = easy_clearcacheall.empty_cache(
-                    anything=get_value_at_index(easy_cleangpuused_43, 0),
-                    unique_id=10390157557927668883,
-                )
+            impactswitch_63 = impactswitch.doit(
+                select=get_value_at_index(impactswitch_62, 2),
+                sel_mode=False,
+                input1=get_value_at_index(conditioningconcat_33, 0),
+                input2=get_value_at_index(controlnetapplyadvanced_35, 1),
+                unique_id=63,
+            )
 
-                easy_cleangpuused_45 = easy_cleangpuused.empty_cache(
-                    anything=get_value_at_index(vaedecode_8, 0),
-                    unique_id=5840249241297495656,
-                )
+            ksampler_3 = ksampler.sample(
+                seed=manager.config.seed,
+                steps=manager.config.steps,
+                cfg=manager.config.guidance_scale,
+                sampler_name="euler",
+                scheduler="normal",
+                denoise=1,
+                model=get_value_at_index(last_lora, 0),
+                positive=get_value_at_index(impactswitch_62, 0),
+                negative=get_value_at_index(impactswitch_63, 0),
+                latent_image=get_value_at_index(emptylatentimage_5, 0),
+            )
 
-                easy_clearcacheall_46 = easy_clearcacheall.empty_cache(
-                    anything=get_value_at_index(easy_cleangpuused_45, 0),
-                    unique_id=12735645180315196723,
-                )
+            vaedecode_8 = vaedecode.decode(
+                samples=get_value_at_index(ksampler_3, 0),
+                vae=get_value_at_index(checkpointloadersimple_12, 2),
+            )
 
-                reactorfaceswap_57 = reactorfaceswap.execute(
-                    enabled=True,
-                    swap_model="inswapper_128.onnx",
-                    facedetection="retinaface_resnet50",
-                    face_restore_model="GPEN-BFR-512.onnx",
-                    face_restore_visibility=1,
-                    codeformer_weight=0.5,
-                    detect_gender_input="no",
-                    detect_gender_source="no",
-                    input_faces_index="0",
-                    source_faces_index="0",
-                    console_log_level=1,
-                    input_image=get_value_at_index(vaedecode_8, 0),
-                    source_image=get_value_at_index(loadimage_56, 0),
-                )
+            easy_cleangpuused_43 = easy_cleangpuused.empty_cache(
+                anything=get_value_at_index(last_lora, 0),
+                unique_id=10755185619704895890,
+            )
 
-                image_comparer_rgthree_58 = (
-                    image_comparer_rgthree.compare_images(
-                        image_a=get_value_at_index(vaedecode_8, 0),
-                        image_b=get_value_at_index(reactorfaceswap_57, 0),
-                    )
-                )
+            easy_clearcacheall_44 = easy_clearcacheall.empty_cache(
+                anything=get_value_at_index(easy_cleangpuused_43, 0),
+                unique_id=10390157557927668883,
+            )
 
-                if manager.config.output_path != pathlib.Path(""):
-                    print(f"Output dir: {manager.config.output_path}")
-                    saveimage.output_dir = (
-                        manager.config.output_path.expanduser().as_posix()
-                    )
-                saveimage_59 = saveimage.save_images(
-                    filename_prefix="ComfyUI",
-                    images=get_value_at_index(reactorfaceswap_57, 0),
+            easy_cleangpuused_45 = easy_cleangpuused.empty_cache(
+                anything=get_value_at_index(vaedecode_8, 0),
+                unique_id=5840249241297495656,
+            )
+
+            easy_clearcacheall_46 = easy_clearcacheall.empty_cache(
+                anything=get_value_at_index(easy_cleangpuused_45, 0),
+                unique_id=12735645180315196723,
+            )
+
+            reactorfaceswap_57 = reactorfaceswap.execute(
+                enabled=True,
+                swap_model="inswapper_128.onnx",
+                facedetection="retinaface_resnet50",
+                face_restore_model="GPEN-BFR-512.onnx",
+                face_restore_visibility=1,
+                codeformer_weight=0.5,
+                detect_gender_input="no",
+                detect_gender_source="no",
+                input_faces_index="0",
+                source_faces_index="0",
+                console_log_level=1,
+                input_image=get_value_at_index(vaedecode_8, 0),
+                source_image=get_value_at_index(loadimage_56, 0),
+            )
+
+            image_comparer_rgthree_58 = image_comparer_rgthree.compare_images(
+                image_a=get_value_at_index(vaedecode_8, 0),
+                image_b=get_value_at_index(reactorfaceswap_57, 0),
+            )
+
+            if manager.config.output_path != pathlib.Path(""):
+                saveimage.output_dir = (
+                    manager.config.output_path.expanduser().as_posix()
                 )
+            saveimage_59 = saveimage.save_images(
+                filename_prefix="ComfyUI",
+                images=get_value_at_index(reactorfaceswap_57, 0),
+            )
 
     generate()
 
