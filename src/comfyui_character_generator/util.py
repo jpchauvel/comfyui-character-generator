@@ -211,7 +211,9 @@ class Config:
             self._set_comfyui_path(attrs["comfyui_path"])
             self._set_venv(attrs["venv_path"])
             self._set_ckpt(attrs["ckpt"])
-            self._set_loras_and_strengths(attrs["loras"], attrs["lora_strengths"])
+            self._set_loras_and_strengths(
+                attrs["loras"], attrs["lora_strengths"]
+            )
             self._set_controlnet(attrs["controlnet"])
             self.disable_controlnet = attrs["disable_controlnet"]
             self.steps = attrs["steps"]
@@ -359,6 +361,50 @@ class Config:
     def load(cls, data: str) -> Self:
         return cls.from_dict(json.loads(data))
 
+    @classmethod
+    def load_from_toml(cls, config_path: pathlib.Path) -> Self:
+        with open(config_path, "rb") as fd:
+            doc_dict: dict[str, Any] = tomllib.load(fd)
+
+        config = cls(
+            comfyui_path=pathlib.Path(doc_dict["config"]["comfyui_path"]),
+            venv_path=pathlib.Path(doc_dict["config"]["venv_path"]),
+            ckpt=doc_dict["config"]["ckpt_path"],
+            loras=doc_dict["config"]["lora_paths"],
+            lora_strengths=doc_dict["config"]["lora_strengths"],
+            controlnet=doc_dict["config"]["controlnet_path"],
+            disable_controlnet=doc_dict["config"].get(
+                "disable_controlnet", DEFAULT_DISABLE_CONTROLNET
+            ),
+            steps=doc_dict["config"].get("steps", DEFAULT_STEPS),
+            seed=doc_dict["config"].get("seed", random.randint(1, 2**64)),
+            guidance_scale=doc_dict["config"].get(
+                "guidance_scale", DEFAULT_GUIDANCE_SCALE
+            ),
+            batch=doc_dict["config"].get("batch", DEFAULT_BATCH),
+            width=doc_dict["config"].get("width", DEFAULT_WIDTH),
+            aspect_ratio=doc_dict["config"].get(
+                "aspect_ratio", DEFAULT_ASPECT_RATIO
+            ),
+            system_prompt=doc_dict["config"]["system_prompt"],
+            neg_prompts=doc_dict["config"]["neg_prompts"],
+            sub_prompts=doc_dict["config"]["sub_prompts"],
+            face_swap_image=doc_dict["config"]["face_swap_image_path"],
+            pose_image=doc_dict["config"]["pose_image_path"],
+            loop_count=doc_dict["config"].get(
+                "loop_count", DEFAULT_LOOP_COUNT
+            ),
+            seed_generation=SeedGenerationMethod(
+                doc_dict["config"].get(
+                    "seed_generation", DEFAULT_SEED_GENERATION
+                )
+            ),
+            output_path=pathlib.Path(
+                doc_dict["config"].get("output_path", "")
+            ),
+        )
+        return config
+
 
 def add_with_rotate_64(a, b) -> int:
     full_sum: int = a + b
@@ -410,7 +456,7 @@ class AppManager:
         else:
             self._args = get_args()
             if self._args.config_path is not None:
-                self._config = load_toml_config(self._args.config_path)
+                self._config = Config.load_from_toml(self._args.config_path)
             elif None not in (
                 self._args.comfyui_path,
                 self._args.ckpt_path,
@@ -449,7 +495,9 @@ class AppManager:
             guidance_scale=self._args.guidance_scale,
             batch=self._args.batch,
             width=self._args.width,
-            system_prompt=self._get_system_prompt(self._args.system_prompt_path),
+            system_prompt=self._get_system_prompt(
+                self._args.system_prompt_path
+            ),
             neg_prompts=self._get_prompts(self._args.neg_prompts_path),
             sub_prompts=self._get_prompts(self._args.sub_prompts_path),
             face_swap_image=self._args.face_swap_image_path,
@@ -460,15 +508,11 @@ class AppManager:
         )
 
     def _get_system_prompt(self, system_prompt_path: str) -> str:
-        with open(
-            pathlib.Path(system_prompt_path).expanduser(), "r"
-        ) as fd:
+        with open(pathlib.Path(system_prompt_path).expanduser(), "r") as fd:
             return fd.read().strip()
 
     def _get_prompts(self, prompts_path: str) -> list[str]:
-        with open(
-            pathlib.Path(prompts_path).expanduser(), "r"
-        ) as fd:
+        with open(pathlib.Path(prompts_path).expanduser(), "r") as fd:
             return fd.read().splitlines()
 
     def _chdir(self) -> None:
@@ -497,33 +541,3 @@ class AppManager:
     @property
     def pythonpath(self) -> pathlib.Path:
         return self.basedir.parent
-
-
-def load_toml_config(config_path: pathlib.Path) -> Config:
-    with open(config_path, "rb") as fd:
-        doc_dict: dict[str, Any] = tomllib.load(fd)
-
-    config: Config = Config(
-        comfyui_path=pathlib.Path(doc_dict["config"]["comfyui_path"]),
-        venv_path=pathlib.Path(doc_dict["config"]["venv_path"]),
-        ckpt=doc_dict["config"]["ckpt_path"],
-        loras=doc_dict["config"]["lora_paths"],
-        lora_strengths=doc_dict["config"]["lora_strengths"],
-        controlnet=doc_dict["config"]["controlnet_path"],
-        disable_controlnet=doc_dict["config"].get("disable_controlnet", DEFAULT_DISABLE_CONTROLNET),
-        steps=doc_dict["config"].get("steps", DEFAULT_STEPS),
-        seed=doc_dict["config"].get("seed", random.randint(1, 2**64)),
-        guidance_scale=doc_dict["config"].get("guidance_scale", DEFAULT_GUIDANCE_SCALE),
-        batch=doc_dict["config"].get("batch", DEFAULT_BATCH),
-        width=doc_dict["config"].get("width", DEFAULT_WIDTH),
-        aspect_ratio=doc_dict["config"].get("aspect_ratio", DEFAULT_ASPECT_RATIO),
-        system_prompt=doc_dict["config"]["system_prompt"],
-        neg_prompts=doc_dict["config"]["neg_prompts"],
-        sub_prompts=doc_dict["config"]["sub_prompts"],
-        face_swap_image=doc_dict["config"]["face_swap_image_path"],
-        pose_image=doc_dict["config"]["pose_image_path"],
-        loop_count=doc_dict["config"].get("loop_count", DEFAULT_LOOP_COUNT),
-        seed_generation=SeedGenerationMethod(doc_dict["config"].get("seed_generation", DEFAULT_SEED_GENERATION)),
-        output_path=pathlib.Path(doc_dict["config"].get("output_path", ""))
-    )
-    return config
