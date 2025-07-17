@@ -448,7 +448,6 @@ def sub_with_rotate_64(a, b) -> int:
 
 class AppManager:
     def __init__(self, data: str | None = None) -> None:
-        self._input = None
         if data is not None:
             self._config = Config.load(data)
             self._args = None
