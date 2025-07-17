@@ -203,11 +203,119 @@ class Config:
     seed_generation: SeedGenerationMethod = DEFAULT_SEED_GENERATION
     output_path: pathlib.Path = pathlib.Path("")
 
-    def __init__(self, **attrs) -> None:
-        for attr in attrs:
-            setattr(self, attr, attrs[attr])
+    def __init__(self, validate: bool = True, **attrs) -> None:
         self._neg_prompt_iter = None
         self._sub_prompt_iter = None
+        self._input_path: pathlib.Path | None = None
+        if validate:
+            self._set_comfyui_path(attrs["comfyui_path"])
+            self._set_venv(attrs["venv_path"])
+            self._set_ckpt(attrs["ckpt"])
+            self._set_loras_and_strengths(attrs["loras"], attrs["lora_strengths"])
+            self._set_controlnet(attrs["controlnet"])
+            self.disable_controlnet = attrs["disable_controlnet"]
+            self.steps = attrs["steps"]
+            self.seed = attrs["seed"]
+            self.guidance_scale = attrs["guidance_scale"]
+            self.batch = attrs["batch"]
+            self._set_resolution(attrs["width"])
+            self.aspect_ratio = attrs["aspect_ratio"]
+            self.system_prompt = attrs["system_prompt"]
+            self.neg_prompts = attrs["neg_prompts"]
+            self.sub_prompts = attrs["sub_prompts"]
+            self._set_face_swap_image(attrs["face_swap_image"])
+            self._set_pose_image(attrs["pose_image"])
+            self.loop_count = attrs["loop_count"]
+            self.seed_generation = SeedGenerationMethod(
+                attrs["seed_generation"]
+            )
+            self.output_path = pathlib.Path(attrs["output_path"])
+        else:
+            for key, value in attrs.items():
+                setattr(self, key, value)
+
+    def _set_comfyui_path(self, value: str) -> None:
+        comfyui_path: pathlib.Path = pathlib.Path(value).expanduser()
+        if not os.path.isdir(comfyui_path):
+            raise ValueError(f"ComfyUI directory not found: {comfyui_path}")
+        self.comfyui_path = comfyui_path
+        self._input_path = comfyui_path / "input"
+
+    def _set_venv(self, value: str) -> None:
+        if self.comfyui_path is None:
+            raise ValueError("ComfyUI path is not set")
+        venv_path = self.comfyui_path / value
+        if not os.path.isdir(venv_path):
+            raise ValueError(f"Environment directory not found: {venv_path}")
+        self.venv_path = venv_path
+
+    def _set_ckpt(self, value: str) -> None:
+        if self.comfyui_path is None:
+            raise ValueError("ComfyUI path is not set")
+        ckpt_path: pathlib.Path = (
+            self.comfyui_path / MODEL_DIRECTORY / CHECKPOINT_DIRECTORY / value
+        ).expanduser()
+        if not os.path.isfile(ckpt_path):
+            raise ValueError(f"Checkpoint file not found: {ckpt_path}")
+        self.ckpt = value
+
+    def _set_loras_and_strengths(
+        self, loras: list[str], strengths: list[float]
+    ) -> None:
+        if self.comfyui_path is None:
+            raise ValueError("ComfyUI path is not set")
+        if len(loras) != len(strengths):
+            raise ValueError(
+                "Number of loras and lora strengths must be the same"
+            )
+        for lora in loras:
+            lora_path: pathlib.Path = (
+                self.comfyui_path / MODEL_DIRECTORY / LORA_DIRECTORY / lora
+            ).expanduser()
+            if not os.path.isfile(lora_path):
+                raise ValueError(f"Lora file not found: {lora_path}")
+        self.loras = loras
+        self.lora_strengths = strengths
+
+    def _set_controlnet(self, value: str) -> None:
+        if self.comfyui_path is None:
+            raise ValueError("ComfyUI path is not set")
+        controlnet_path: pathlib.Path = (
+            self.comfyui_path / MODEL_DIRECTORY / CONTROLNET_DIRECTORY / value
+        ).expanduser()
+        if not os.path.isfile(controlnet_path):
+            raise ValueError(f"Controlnet file not found: {controlnet_path}")
+        self.controlnet = value
+
+    def _set_resolution(self, width: int) -> None:
+        if self.aspect_ratio is None:
+            raise ValueError("Aspect ratio is not set")
+        self.width = width
+        self.height = int(width * ASPECT_RATIO[self.aspect_ratio])
+
+    def _set_face_swap_image(self, value: str) -> None:
+        if self._input_path is None:
+            raise ValueError("Input path is not set")
+        face_swap_image_path: pathlib.Path = pathlib.Path(value).expanduser()
+        if not os.path.isfile(face_swap_image_path):
+            raise ValueError(
+                f"Face swap image file not found: {face_swap_image_path}"
+            )
+        shutil.copyfile(
+            face_swap_image_path, self._input_path / face_swap_image_path.name
+        )
+        self.face_swap_image = face_swap_image_path.name
+
+    def _set_pose_image(self, value: str) -> None:
+        if self._input_path is None:
+            raise ValueError("Input path is not set")
+        pose_image_path: pathlib.Path = pathlib.Path(value).expanduser()
+        if not os.path.isfile(pose_image_path):
+            raise ValueError(f"Pose image file not found: {pose_image_path}")
+        shutil.copyfile(
+            pose_image_path, self._input_path / pose_image_path.name
+        )
+        self.pose_image = pose_image_path.name
 
     @property
     def next_neg_prompt(self) -> str:
@@ -242,7 +350,7 @@ class Config:
         for key, value in data.items():
             if key in ("comfyui_path", "venv_path", "output_path"):
                 data[key] = pathlib.Path(value)
-        return cls(**data)
+        return cls(validate=False, **data)
 
     def dump(self) -> str:
         return json.dumps(asdict(self), default=self.dict_factory)
@@ -300,7 +408,6 @@ class AppManager:
             self._args = None
             self._chdir()
         else:
-            self._config = Config()
             self._args = get_args()
             if self._args.config_path is not None:
                 self._config = load_toml_config(self._args.config_path)
@@ -329,158 +436,40 @@ class AppManager:
     def _set_config_from_args(self) -> None:
         if self._args is None:
             return
-        self._set_comfyui_path()
-        self._set_venv()
-        self._set_ckpt()
-        self._set_loras_and_strengths()
-        self._set_controlnet()
-        self.config.disable_controlnet = self._args.disable_controlnet
-        self.config.steps = self._args.steps
-        self.config.seed = self._args.seed
-        self.config.guidance_scale = self._args.guidance_scale
-        self.config.batch = self._args.batch
-        self._set_resolution()
-        self.config.aspect_ratio = self._args.aspect_ratio
-        self._set_system_prompt()
-        self._set_neg_prompts()
-        self._set_sub_prompts()
-        self._set_face_swap_image()
-        self._set_pose_image()
-        self.config.loop_count = self._args.loop_count
-        self.config.seed_generation = SeedGenerationMethod(
-            self._args.seed_generation
-        )
-        self.config.output_path = pathlib.Path(self._args.output_path)
-
-    def _set_comfyui_path(self) -> None:
-        if self._args is None:
-            return
-        self.config.comfyui_path = pathlib.Path(
-            self._args.comfyui_path
-        ).expanduser()
-        if not os.path.isdir(self.config.comfyui_path):
-            raise ValueError(
-                f"ComfyUI directory not found: {self.config.comfyui_path}"
-            )
-        self._input_path: pathlib.Path = self.config.comfyui_path / "input"
-
-    def _set_venv(self) -> None:
-        if self._args is None:
-            return
-        venv_path: pathlib.Path = (
-            self._args.venv_path
-            if self.config.venv_path is None
-            else self.config.venv_path
-        ).expanduser()
-        venv_path = self.config.comfyui_path / self._args.venv_path
-        if not os.path.isdir(venv_path):
-            raise ValueError(f"Environment directory not found: {venv_path}")
-        self.config.venv_path = venv_path
-
-    def _set_ckpt(self) -> None:
-        if self._args is None or self.config.comfyui_path is None:
-            return
-        ckpt_path: pathlib.Path = (
-            self.config.comfyui_path
-            / MODEL_DIRECTORY
-            / CHECKPOINT_DIRECTORY
-            / self._args.ckpt_path
-        ).expanduser()
-        if not os.path.isfile(ckpt_path):
-            raise ValueError(f"Checkpoint file not found: {ckpt_path}")
-        self.config.ckpt = self._args.ckpt_path
-
-    def _set_loras_and_strengths(self) -> None:
-        if self._args is None or self.config.comfyui_path is None:
-            return
-        if len(self._args.lora_paths) != len(self._args.lora_strengths):
-            raise ValueError(
-                "Number of loras and lora strengths must be the same"
-            )
-        for lora_path in self._args.lora_paths:
-            lora_path = (
-                self.config.comfyui_path
-                / MODEL_DIRECTORY
-                / LORA_DIRECTORY
-                / lora_path
-            ).expanduser()
-            if not os.path.isfile(lora_path):
-                raise ValueError(f"Lora file not found: {lora_path}")
-        self.config.loras = self._args.lora_paths
-        self.config.lora_strengths = self._args.lora_strengths
-
-    def _set_controlnet(self) -> None:
-        if self._args is None or self.config.comfyui_path is None:
-            return
-        controlnet_path: pathlib.Path = (
-            self.config.comfyui_path
-            / MODEL_DIRECTORY
-            / CONTROLNET_DIRECTORY
-            / self._args.controlnet_path
-        ).expanduser()
-        if not os.path.isfile(controlnet_path):
-            raise ValueError(f"Controlnet file not found: {controlnet_path}")
-        self.config.controlnet = self._args.controlnet_path
-
-    def _set_resolution(self) -> None:
-        if self._args is None:
-            return
-        self.config.width = self._args.width
-        self.config.height = int(
-            self._args.width * ASPECT_RATIO[self._args.aspect_ratio]
+        self._config = Config(
+            comfyui_path=self._args.comfyui_path,
+            venv_path=self._args.venv_path,
+            ckpt=self._args.ckpt_path,
+            loras=self._args.lora_paths,
+            lora_strengths=self._args.lora_strengths,
+            controlnet_path=self._args.controlnet_path,
+            disable_controlnet=self._args.disable_controlnet,
+            steps=self._args.steps,
+            seed=self._args.seed,
+            guidance_scale=self._args.guidance_scale,
+            batch=self._args.batch,
+            width=self._args.width,
+            system_prompt=self._get_system_prompt(self._args.system_prompt_path),
+            neg_prompts=self._get_prompts(self._args.neg_prompts_path),
+            sub_prompts=self._get_prompts(self._args.sub_prompts_path),
+            face_swap_image=self._args.face_swap_image_path,
+            pose_image=self._args.pose_image_path,
+            loop_count=self._args.loop_count,
+            seed_generation=SeedGenerationMethod(self._args.seed_generation),
+            output_path=self._args.output_path,
         )
 
-    def _set_system_prompt(self) -> None:
-        if self._args is None:
-            return
+    def _get_system_prompt(self, system_prompt_path: str) -> str:
         with open(
-            pathlib.Path(self._args.system_prompt_path).expanduser(), "r"
+            pathlib.Path(system_prompt_path).expanduser(), "r"
         ) as fd:
-            self.config.system_prompt = fd.read().strip()
+            return fd.read().strip()
 
-    def _set_neg_prompts(self) -> None:
-        if self._args is None:
-            return
+    def _get_prompts(self, prompts_path: str) -> list[str]:
         with open(
-            pathlib.Path(self._args.neg_prompts_path).expanduser(), "r"
+            pathlib.Path(prompts_path).expanduser(), "r"
         ) as fd:
-            self.config.neg_prompts = fd.read().splitlines()
-
-    def _set_sub_prompts(self) -> None:
-        if self._args is None:
-            return
-        with open(
-            pathlib.Path(self._args.sub_prompts_path).expanduser(), "r"
-        ) as fd:
-            self.config.sub_prompts = fd.read().splitlines()
-
-    def _set_face_swap_image(self) -> None:
-        if self._args is None:
-            return
-        face_swap_image_path: pathlib.Path = pathlib.Path(
-            self._args.face_swap_image_path
-        ).expanduser()
-        if not os.path.isfile(face_swap_image_path):
-            raise ValueError(
-                f"Face swap image file not found: {face_swap_image_path}"
-            )
-        shutil.copyfile(
-            face_swap_image_path, self._input_path / face_swap_image_path.name
-        )
-        self.config.face_swap_image = face_swap_image_path.name
-
-    def _set_pose_image(self) -> None:
-        if self._args is None:
-            return
-        pose_image_path: pathlib.Path = pathlib.Path(
-            self._args.pose_image_path
-        ).expanduser()
-        if not os.path.isfile(pose_image_path):
-            raise ValueError(f"Pose image file not found: {pose_image_path}")
-        shutil.copyfile(
-            pose_image_path, self._input_path / pose_image_path.name
-        )
-        self.config.pose_image = pose_image_path.name
+            return fd.read().splitlines()
 
     def _chdir(self) -> None:
         if self.config.comfyui_path is None:
@@ -513,91 +502,28 @@ class AppManager:
 def load_toml_config(config_path: pathlib.Path) -> Config:
     with open(config_path, "rb") as fd:
         doc_dict: dict[str, Any] = tomllib.load(fd)
-    config: Config = Config()
-    config.comfyui_path = pathlib.Path(
-        doc_dict["config"]["comfyui_path"]
-    ).expanduser()
-    if not os.path.isdir(config.comfyui_path):
-        raise ValueError(f"ComfyUI directory not found: {config.comfyui_path}")
-    input_path: pathlib.Path = config.comfyui_path / "input"
-    venv_path: str = doc_dict["config"].get("venv_path", DEFAULT_VENV_PATH)
-    config.venv_path = config.comfyui_path / venv_path
-    if not os.path.isdir(config.venv_path):
-        raise ValueError(f"Environment directory not found: {venv_path}")
-    ckpt: str = doc_dict["config"]["ckpt_path"]
-    ckpt_path: pathlib.Path = (
-        config.comfyui_path / MODEL_DIRECTORY / CHECKPOINT_DIRECTORY / ckpt
-    ).expanduser()
-    if not os.path.isfile(ckpt_path):
-        raise ValueError(f"Checkpoint file not found: {ckpt_path}")
-    config.ckpt = ckpt
-    loras: list[str] = doc_dict["config"]["lora_paths"]
-    lora_strengths: list[float] = doc_dict["config"]["lora_strengths"]
-    if len(loras) != len(lora_strengths):
-        raise ValueError("Number of loras and lora strengths must be the same")
-    for lora in loras:
-        lora_path = (
-            config.comfyui_path / MODEL_DIRECTORY / LORA_DIRECTORY / lora
-        ).expanduser()
-        if not os.path.isfile(lora_path):
-            raise ValueError(f"Lora file not found: {lora_path}")
-    config.loras = loras
-    config.lora_strengths = lora_strengths
-    controlnet: str = doc_dict["config"]["controlnet_path"]
-    controlnet_path: pathlib.Path = (
-        config.comfyui_path
-        / MODEL_DIRECTORY
-        / CONTROLNET_DIRECTORY
-        / controlnet
-    ).expanduser()
-    if not os.path.isfile(controlnet_path):
-        raise ValueError(f"Controlnet file not found: {controlnet_path}")
-    config.controlnet = controlnet
-    config.disable_controlnet = doc_dict["config"].get(
-        "disable_controlnet", DEFAULT_DISABLE_CONTROLNET
-    )
-    config.steps = doc_dict["config"].get("steps", DEFAULT_STEPS)
-    seed: int | None = doc_dict["config"].get("seed")
-    if seed is None:
-        seed = random.randint(1, 2**64)
-    config.seed = seed
-    config.guidance_scale = doc_dict["config"].get(
-        "guidance_scale", DEFAULT_GUIDANCE_SCALE
-    )
-    config.batch = doc_dict["config"].get("batch", DEFAULT_BATCH)
-    config.width = doc_dict["config"].get("width", DEFAULT_WIDTH)
-    aspect_ratio: str = doc_dict["config"].get(
-        "aspect_ratio", DEFAULT_ASPECT_RATIO
-    )
-    config.height = int(config.width * ASPECT_RATIO[aspect_ratio])
-    config.system_prompt = doc_dict["config"]["system_prompt"]
-    config.neg_prompts = doc_dict["config"]["neg_prompts"]
-    config.sub_prompts = doc_dict["config"]["sub_prompts"]
-    face_swap_image_path: pathlib.Path = pathlib.Path(
-        doc_dict["config"]["face_swap_image_path"]
-    ).expanduser()
-    if not os.path.isfile(face_swap_image_path):
-        raise ValueError(
-            f"Face swap image file not found: {face_swap_image_path}"
-        )
-    shutil.copyfile(
-        face_swap_image_path, input_path / face_swap_image_path.name
-    )
-    config.face_swap_image = face_swap_image_path.name
-    pose_image_path: pathlib.Path = pathlib.Path(
-        doc_dict["config"]["pose_image_path"]
-    ).expanduser()
-    if not os.path.isfile(pose_image_path):
-        raise ValueError(f"Pose image file not found: {pose_image_path}")
-    shutil.copyfile(pose_image_path, input_path / pose_image_path.name)
-    config.pose_image = pose_image_path.name
-    config.loop_count = doc_dict["config"].get(
-        "loop_count", DEFAULT_LOOP_COUNT
-    )
-    config.seed_generation = SeedGenerationMethod(
-        doc_dict["config"]["seed_generation"]
-    )
-    config.output_path = pathlib.Path(
-        doc_dict["config"].get("output_path", "")
+
+    config: Config = Config(
+        comfyui_path=pathlib.Path(doc_dict["config"]["comfyui_path"]),
+        venv_path=pathlib.Path(doc_dict["config"]["venv_path"]),
+        ckpt=doc_dict["config"]["ckpt_path"],
+        loras=doc_dict["config"]["lora_paths"],
+        lora_strengths=doc_dict["config"]["lora_strengths"],
+        controlnet=doc_dict["config"]["controlnet_path"],
+        disable_controlnet=doc_dict["config"].get("disable_controlnet", DEFAULT_DISABLE_CONTROLNET),
+        steps=doc_dict["config"].get("steps", DEFAULT_STEPS),
+        seed=doc_dict["config"].get("seed", random.randint(1, 2**64)),
+        guidance_scale=doc_dict["config"].get("guidance_scale", DEFAULT_GUIDANCE_SCALE),
+        batch=doc_dict["config"].get("batch", DEFAULT_BATCH),
+        width=doc_dict["config"].get("width", DEFAULT_WIDTH),
+        aspect_ratio=doc_dict["config"].get("aspect_ratio", DEFAULT_ASPECT_RATIO),
+        system_prompt=doc_dict["config"]["system_prompt"],
+        neg_prompts=doc_dict["config"]["neg_prompts"],
+        sub_prompts=doc_dict["config"]["sub_prompts"],
+        face_swap_image=doc_dict["config"]["face_swap_image_path"],
+        pose_image=doc_dict["config"]["pose_image_path"],
+        loop_count=doc_dict["config"].get("loop_count", DEFAULT_LOOP_COUNT),
+        seed_generation=SeedGenerationMethod(doc_dict["config"].get("seed_generation", DEFAULT_SEED_GENERATION)),
+        output_path=pathlib.Path(doc_dict["config"].get("output_path", ""))
     )
     return config
