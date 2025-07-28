@@ -1,3 +1,4 @@
+import argparse
 import os
 import pathlib
 import sys
@@ -89,8 +90,22 @@ def import_custom_nodes() -> None:
     init_extra_nodes()
 
 
+def get_args() -> argparse.Namespace:
+    parser: argparse.ArgumentParser = argparse.ArgumentParser(
+        description="Automated ComfyUI Character Generator.",
+    )
+    parser.add_argument(
+        "--prompt_idx",
+        type=int,
+        required=True,
+        help="Prompt index.",
+    )
+    return parser.parse_args()
+
+
 def main() -> None:
     manager: AppManager = AppManager(sys.stdin.read())
+    args: argparse.Namespace = get_args()
 
     import torch
 
@@ -153,32 +168,17 @@ def main() -> None:
             )
 
             cliptextencode_15 = cliptextencode.encode(
-                text=manager.config.next_sub_prompt,
-                clip=get_value_at_index(last_lora, 1),
-            )
-
-            cliptextencode_24 = cliptextencode.encode(
-                text=manager.config.next_sub_prompt,
-                clip=get_value_at_index(last_lora, 1),
-            )
-
-            cliptextencode_26 = cliptextencode.encode(
-                text=manager.config.next_sub_prompt,
-                clip=get_value_at_index(last_lora, 1),
-            )
-
-            cliptextencode_28 = cliptextencode.encode(
-                text=manager.config.next_sub_prompt,
+                text=manager.config.sub_prompts[args.prompt_idx],
                 clip=get_value_at_index(last_lora, 1),
             )
 
             cliptextencode_7 = cliptextencode.encode(
-                text=manager.config.next_neg_prompt,
+                text=manager.config.system_neg_prompt,
                 clip=get_value_at_index(last_lora, 1),
             )
 
             cliptextencode_31 = cliptextencode.encode(
-                text=manager.config.next_neg_prompt,
+                text=manager.config.neg_prompts[args.prompt_idx],
                 clip=get_value_at_index(last_lora, 1),
             )
 
@@ -219,21 +219,6 @@ def main() -> None:
                 conditioning_from=get_value_at_index(cliptextencode_15, 0),
             )
 
-            conditioningconcat_27 = conditioningconcat.concat(
-                conditioning_to=get_value_at_index(cliptextencode_28, 0),
-                conditioning_from=get_value_at_index(cliptextencode_26, 0),
-            )
-
-            conditioningconcat_30 = conditioningconcat.concat(
-                conditioning_to=get_value_at_index(conditioningconcat_27, 0),
-                conditioning_from=get_value_at_index(cliptextencode_24, 0),
-            )
-
-            conditioningconcat_25 = conditioningconcat.concat(
-                conditioning_to=get_value_at_index(conditioningconcat_18, 0),
-                conditioning_from=get_value_at_index(conditioningconcat_30, 0),
-            )
-
             conditioningconcat_33 = conditioningconcat.concat(
                 conditioning_to=get_value_at_index(cliptextencode_7, 0),
                 conditioning_from=get_value_at_index(cliptextencode_31, 0),
@@ -253,7 +238,7 @@ def main() -> None:
                     strength=0.6000000000000001,
                     start_percent=0,
                     end_percent=0.4000000000000001,
-                    positive=get_value_at_index(conditioningconcat_25, 0),
+                    positive=get_value_at_index(conditioningconcat_18, 0),
                     negative=get_value_at_index(conditioningconcat_33, 0),
                     control_net=get_value_at_index(controlnetloader_34, 0),
                     image=get_value_at_index(openposepreprocessor_54, 0),
@@ -264,13 +249,13 @@ def main() -> None:
             impactswitch_62 = impactswitch.doit(
                 select=1 if manager.config.disable_controlnet else 2,
                 sel_mode=False,
-                input1=get_value_at_index(conditioningconcat_25, 0),
+                input1=get_value_at_index(conditioningconcat_18, 0),
                 input2=get_value_at_index(controlnetapplyadvanced_35, 0),
                 unique_id=62,
             )
 
             impactswitch_63 = impactswitch.doit(
-                select=get_value_at_index(impactswitch_62, 2),
+                select=1 if manager.config.disable_controlnet else 2,
                 sel_mode=False,
                 input1=get_value_at_index(conditioningconcat_33, 0),
                 input2=get_value_at_index(controlnetapplyadvanced_35, 1),

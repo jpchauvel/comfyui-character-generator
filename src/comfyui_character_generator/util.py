@@ -14,6 +14,8 @@ ASPECT_RATIO: dict[str, float] = {
     "1:1": 1.0,
     "4:3": 3 / 4,
     "3:4": 4 / 3,
+    "5:4": 4 / 5,
+    "4:5": 5 / 4,
     "16:9": 9 / 16,
     "9:16": 16 / 9,
 }
@@ -138,9 +140,14 @@ def get_args() -> argparse.Namespace:
         help="Path to system prompt text file.",
     )
     parser.add_argument(
+        "--system_neg_prompt_path",
+        default=None,
+        help="Path to system negative prompt text file.",
+    )
+    parser.add_argument(
         "--neg_prompts_path",
         default=None,
-        help="Path to negative prompts text file.",
+        help="Path to negative prompts text file. (Should correlate 1:1 with each --sub_prompts_path)",
     )
     parser.add_argument(
         "--sub_prompts_path",
@@ -195,6 +202,7 @@ class Config:
     height: int = int(DEFAULT_WIDTH * ASPECT_RATIO[DEFAULT_ASPECT_RATIO])
     aspect_ratio: str = DEFAULT_ASPECT_RATIO
     system_prompt: str = ""
+    system_neg_prompt: str = ""
     neg_prompts: list[str] = field(default_factory=list)
     sub_prompts: list[str] = field(default_factory=list)
     face_swap_image: str | None = None
@@ -220,9 +228,13 @@ class Config:
             self.seed = attrs["seed"]
             self.guidance_scale = attrs["guidance_scale"]
             self.batch = attrs["batch"]
-            self._set_resolution(attrs["width"])
             self.aspect_ratio = attrs["aspect_ratio"]
+            self._set_resolution(attrs["width"])
             self.system_prompt = attrs["system_prompt"]
+            self.system_neg_prompt = attrs["system_neg_prompt"]
+            self._set_prompts(
+                values=[attrs["sub_prompts"], attrs["neg_prompts"]]
+            )
             self.neg_prompts = attrs["neg_prompts"]
             self.sub_prompts = attrs["sub_prompts"]
             self._set_face_swap_image(attrs["face_swap_image"])
@@ -295,6 +307,14 @@ class Config:
         self.width = width
         self.height = int(width * ASPECT_RATIO[self.aspect_ratio])
 
+    def _set_prompts(self, values: list[list[str]]) -> None:
+        if len(values[0]) != len(values[1]):
+            raise ValueError(
+                "Number of sub prompts and negative prompts must be the same"
+            )
+        self.sub_prompts = values[0]
+        self.neg_prompts = values[1]
+
     def _set_face_swap_image(self, value: str) -> None:
         if self._input_path is None:
             raise ValueError("Input path is not set")
@@ -320,20 +340,8 @@ class Config:
         self.pose_image = pose_image_path.name
 
     @property
-    def next_neg_prompt(self) -> str:
-        if self._neg_prompt_iter is None:
-            self._neg_prompt_iter = iter(self.neg_prompts)
-        return next(self._neg_prompt_iter, "")
-
-    @property
-    def next_sub_prompt(self) -> str:
-        if self._sub_prompt_iter is None:
-            self._sub_prompt_iter = iter(self.sub_prompts)
-        return next(self._sub_prompt_iter, "")
-
-    @property
-    def next_lora_and_stregnth(self) -> tuple[str, float]:
-        return next(zip(self.loras, self.lora_strengths), ("", 0.0))
+    def sub_prompt_count(self) -> int:
+        return len(self.sub_prompts)
 
     @staticmethod
     def dict_factory(pairs: dict[str, Any] | Any) -> dict[str, Any] | Any:
@@ -387,6 +395,7 @@ class Config:
                 "aspect_ratio", DEFAULT_ASPECT_RATIO
             ),
             system_prompt=doc_dict["config"]["system_prompt"],
+            system_neg_prompt=doc_dict["config"]["system_neg_prompt"],
             neg_prompts=doc_dict["config"]["neg_prompts"],
             sub_prompts=doc_dict["config"]["sub_prompts"],
             face_swap_image=doc_dict["config"]["face_swap_image_path"],
@@ -462,8 +471,7 @@ class AppManager:
                 self._args.lora_paths,
                 self._args.controlnet_path,
                 self._args.system_prompt_path,
-                self._args.neg_prompts_path,
-                self._args.sub_prompts_path,
+                self._args.system_neg_prompt_path,
                 self._args.face_swap_image_path,
                 self._args.pose_image_path,
                 self._args.lora_strengths,
@@ -473,9 +481,9 @@ class AppManager:
                 raise ValueError(
                     "All of the following must be provided: "
                     "--comfyui_path, --ckpt_path, --lora_paths, "
-                    "--controlnet_path, --system_prompt_path, --neg_prompts_path, "
-                    "--sub_prompts_path, --face_swap_image_path, --pose_image_path, "
-                    "--lora_strengths"
+                    "--controlnet_path, --system_prompt_path, "
+                    "--system_neg_prompt_path, --face_swap_image_path, "
+                    "--pose_image_path, --lora_strengths"
                 )
 
     def _set_config_from_args(self) -> None:
@@ -494,8 +502,12 @@ class AppManager:
             guidance_scale=self._args.guidance_scale,
             batch=self._args.batch,
             width=self._args.width,
+            aspect_ratio=self._args.aspect_ratio,
             system_prompt=self._get_system_prompt(
                 self._args.system_prompt_path
+            ),
+            system_neg_prompt=self._get_system_prompt(
+                self._args.system_neg_prompt_path
             ),
             neg_prompts=self._get_prompts(self._args.neg_prompts_path),
             sub_prompts=self._get_prompts(self._args.sub_prompts_path),
@@ -510,7 +522,9 @@ class AppManager:
         with open(pathlib.Path(system_prompt_path).expanduser(), "r") as fd:
             return fd.read().strip()
 
-    def _get_prompts(self, prompts_path: str) -> list[str]:
+    def _get_prompts(self, prompts_path: str | None) -> list[str]:
+        if prompts_path is None:
+            return []
         with open(pathlib.Path(prompts_path).expanduser(), "r") as fd:
             return fd.read().splitlines()
 
