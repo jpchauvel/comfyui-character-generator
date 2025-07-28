@@ -1,7 +1,7 @@
 import shlex
 import subprocess
 
-from comfyui_character_generator.util import AppManager
+from comfyui_character_generator.util.manager import AppManager
 
 
 def main() -> None:

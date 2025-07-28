@@ -4,7 +4,7 @@ import pathlib
 import sys
 from typing import Any, Mapping, Sequence, Union
 
-from comfyui_character_generator.util import AppManager
+from comfyui_character_generator.util.manager import AppManager
 
 
 def get_value_at_index(obj: Union[Sequence, Mapping], index: int) -> Any:
