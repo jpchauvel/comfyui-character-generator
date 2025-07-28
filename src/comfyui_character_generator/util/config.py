@@ -312,8 +312,6 @@ class GlobalConfig(BaseConfig):
             aspect_ratio=doc_dict["global"].get(
                 "aspect_ratio", DEFAULT_ASPECT_RATIO
             ),
-            system_prompt=doc_dict["global"]["system_prompt"],
-            system_neg_prompt=doc_dict["global"]["system_neg_prompt"],
             loop_count=doc_dict["global"].get(
                 "loop_count", DEFAULT_LOOP_COUNT
             ),
@@ -334,6 +332,8 @@ class GlobalConfig(BaseConfig):
             sub_config_attrs: dict[str, Any] = deepcopy(config_attrs)
             sub_config_attrs.update(
                 dict(
+                    system_prompt=doc_dict[key]["system_prompt"],
+                    system_neg_prompt=doc_dict[key]["system_neg_prompt"],
                     neg_prompts=doc_dict[key]["neg_prompts"],
                     sub_prompts=doc_dict[key]["sub_prompts"],
                     face_swap_images=doc_dict[key]["face_swap_image_paths"],
