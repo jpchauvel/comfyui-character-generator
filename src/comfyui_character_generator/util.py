@@ -147,7 +147,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         "--neg_prompts_path",
         default=None,
-        help="Path to negative prompts text file. (Should correlate 1:1 with each --sub_prompts_path)",
+        help="Path to negative prompts text file. If provided should match the number of sub prompts.",
     )
     parser.add_argument(
         "--sub_prompts_path",
@@ -159,14 +159,14 @@ def get_args() -> argparse.Namespace:
         nargs="*",
         type=str,
         default=[],
-        help="Path to face swap image files. (Should correlate 1:1 with each --pose_image_paths)",
+        help="Path to face swap image files. If provided should match the number of sub prompts.",
     )
     parser.add_argument(
         "--pose_image_paths",
         nargs="*",
         type=str,
         default=[],
-        help="Path to pose image files. (Should correlate 1:1 with each --face_swap_image_paths)",
+        help="Path to pose image files. If provided should match the number of sub prompts.",
     )
     parser.add_argument(
         "--loop_count",
@@ -248,7 +248,7 @@ class Config:
             self.sub_prompts = attrs["sub_prompts"]
             self._set_face_swap_images(attrs["face_swap_images"])
             self._set_pose_images(attrs["pose_images"])
-            self._validate_face_swap_images_and_pose_images()
+            self._validate_sub_prompt_length()
             self.loop_count = attrs["loop_count"]
             self.seed_generation = SeedGenerationMethod(
                 attrs["seed_generation"]
@@ -358,10 +358,14 @@ class Config:
             pose_images.append(pose_image_path.name)
         self.pose_images = pose_images
 
-    def _validate_face_swap_images_and_pose_images(self) -> None:
-        if len(self.face_swap_images) != len(self.pose_images):
+    def _validate_sub_prompt_length(self) -> None:
+        if len(self.sub_prompts) not in (
+            len(self.face_swap_images),
+            len(self.pose_images),
+        ):
+
             raise ValueError(
-                "Number of face swap images and pose images must be the same"
+                "Number of sub prompts, face swap images and pose images must be the same"
             )
 
     @property

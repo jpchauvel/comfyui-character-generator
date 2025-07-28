@@ -100,12 +100,6 @@ def get_args() -> argparse.Namespace:
         required=True,
         help="Prompt index.",
     )
-    parser.add_argument(
-        "--pose_and_face_swap_idx",
-        type=int,
-        required=True,
-        help="Pose and face swap index.",
-    )
     return parser.parse_args()
 
 
@@ -195,13 +189,11 @@ def main() -> None:
 
             loadimage = NODE_CLASS_MAPPINGS["LoadImage"]()
             loadimage_51 = loadimage.load_image(
-                image=manager.config.pose_images[args.pose_and_face_swap_idx]
+                image=manager.config.pose_images[args.prompt_idx]
             )
 
             loadimage_56 = loadimage.load_image(
-                image=manager.config.face_swap_images[
-                    args.pose_and_face_swap_idx
-                ]
+                image=manager.config.face_swap_images[args.prompt_idx]
             )
 
             conditioningconcat = NODE_CLASS_MAPPINGS["ConditioningConcat"]()

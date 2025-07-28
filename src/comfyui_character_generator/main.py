@@ -24,28 +24,24 @@ def main() -> None:
         )
         subprocess.run([command, *args], shell=False)
     else:
-        for pose_and_face_swap_idx in range(
-            manager.config.pose_and_face_swap_count
-        ):
+        for _ in range(manager.config.loop_count):
             for prompt_idx in range(manager.config.sub_prompt_count):
-                for _ in range(manager.config.loop_count):
-                    command = shlex.quote(
-                        (manager.basedir / "bin" / "generate.sh").as_posix()
-                    )
-                    args = (
-                        shlex.quote(manager.config.venv_path.as_posix()),
-                        shlex.quote(manager.pythonpath.as_posix()),
-                        shlex.quote(str(prompt_idx)),
-                        shlex.quote(str(pose_and_face_swap_idx)),
-                    )
+                command = shlex.quote(
+                    (manager.basedir / "bin" / "generate.sh").as_posix()
+                )
+                args = (
+                    shlex.quote(manager.config.venv_path.as_posix()),
+                    shlex.quote(manager.pythonpath.as_posix()),
+                    shlex.quote(str(prompt_idx)),
+                )
 
-                    subprocess.run(
-                        [command, *args],
-                        input=manager.config.dump().encode("utf-8"),
-                        shell=False,
-                    )
+                subprocess.run(
+                    [command, *args],
+                    input=manager.config.dump().encode("utf-8"),
+                    shell=False,
+                )
 
-                    manager.config.seed = manager.generate_new_seed()
+                manager.config.seed = manager.generate_new_seed()
 
 
 if __name__ == "__main__":
