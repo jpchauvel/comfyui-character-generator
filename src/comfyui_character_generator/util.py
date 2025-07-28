@@ -186,6 +186,11 @@ def get_args() -> argparse.Namespace:
         default="",
         help="Path to output directory.",
     )
+    parser.add_argument(
+        "--install_nodes",
+        action="store_true",
+        help="Install custom nodes. (Must provide --comfyui_path and --venv_path)",
+    )
     return parser.parse_known_args(sys.argv)[0]
 
 
@@ -481,13 +486,26 @@ def sub_with_rotate_64(a, b) -> int:
 
 class AppManager:
     def __init__(self, data: str | None = None) -> None:
+        self._should_install_nodes = False
         if data is not None:
             self._config = Config.load(data)
             self._args = None
             self._chdir()
         else:
             self._args = get_args()
-            if self._args.config_path is not None:
+            if self._args.install_nodes:
+                if None in (
+                    self._args.comfyui_path,
+                    self._args.venv_path,
+                ):
+                    raise ValueError(
+                        "Both --comfyui_path and --venv_path must be provided"
+                    )
+                self._config = Config(validate=False, **{})
+                self._config._set_comfyui_path(self._args.comfyui_path)
+                self._config._set_venv(self._args.venv_path)
+                self._should_install_nodes = True
+            elif self._args.config_path is not None:
                 self._config = Config.load_from_toml(self._args.config_path)
             elif None not in (
                 self._args.comfyui_path,
@@ -566,6 +584,10 @@ class AppManager:
                 return sub_with_rotate_64(self.config.seed, 1)
             case SeedGenerationMethod.RANDOM:
                 return random.randint(1, 2**64)
+
+    @property
+    def should_install_nodes(self) -> bool:
+        return self._should_install_nodes
 
     @property
     def config(self) -> Config:

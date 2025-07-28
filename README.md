@@ -29,3 +29,9 @@ uvx --from git+https://github.com/jpchauvel/comfyui-character-generator comfyui-
 ```
 
 It will prompt with all the necessary information.
+
+**NOTE**: You can install the custom nodes using the following command:
+
+```sh
+uvx --from git+https://github.com/jpchauvel/comfyui-character-generator comfyui-character-generator --install_nodes --confyui_path /path/to/comfyui --venv_path relative/path/to/venv
+```
