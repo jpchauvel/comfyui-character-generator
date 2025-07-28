@@ -155,14 +155,18 @@ def get_args() -> argparse.Namespace:
         help="Path to sub-prompts text file. Prompts are separeted by newlines.",
     )
     parser.add_argument(
-        "--face_swap_image_path",
-        default=None,
-        help="Path to face swap image file.",
+        "--face_swap_image_paths",
+        nargs="*",
+        type=str,
+        default=[],
+        help="Path to face swap image files. (Should correlate 1:1 with each --pose_image_paths)",
     )
     parser.add_argument(
-        "--pose_image_path",
-        default=None,
-        help="Path to pose image file.",
+        "--pose_image_paths",
+        nargs="*",
+        type=str,
+        default=[],
+        help="Path to pose image files. (Should correlate 1:1 with each --face_swap_image_paths)",
     )
     parser.add_argument(
         "--loop_count",
@@ -205,8 +209,8 @@ class Config:
     system_neg_prompt: str = ""
     neg_prompts: list[str] = field(default_factory=list)
     sub_prompts: list[str] = field(default_factory=list)
-    face_swap_image: str | None = None
-    pose_image: str | None = None
+    face_swap_images: list[str] = field(default_factory=list)
+    pose_images: list[str] = field(default_factory=list)
     loop_count: int = DEFAULT_LOOP_COUNT
     seed_generation: SeedGenerationMethod = DEFAULT_SEED_GENERATION
     output_path: pathlib.Path = pathlib.Path("")
@@ -237,8 +241,9 @@ class Config:
             )
             self.neg_prompts = attrs["neg_prompts"]
             self.sub_prompts = attrs["sub_prompts"]
-            self._set_face_swap_image(attrs["face_swap_image"])
-            self._set_pose_image(attrs["pose_image"])
+            self._set_face_swap_images(attrs["face_swap_images"])
+            self._set_pose_images(attrs["pose_images"])
+            self._validate_face_swap_images_and_pose_images()
             self.loop_count = attrs["loop_count"]
             self.seed_generation = SeedGenerationMethod(
                 attrs["seed_generation"]
@@ -315,33 +320,52 @@ class Config:
         self.sub_prompts = values[0]
         self.neg_prompts = values[1]
 
-    def _set_face_swap_image(self, value: str) -> None:
+    def _set_face_swap_images(self, value: list[str]) -> None:
         if self._input_path is None:
             raise ValueError("Input path is not set")
-        face_swap_image_path: pathlib.Path = pathlib.Path(value).expanduser()
-        if not os.path.isfile(face_swap_image_path):
-            raise ValueError(
-                f"Face swap image file not found: {face_swap_image_path}"
+        face_swap_images: list[str] = []
+        for v in value:
+            face_swap_image_path: pathlib.Path = pathlib.Path(v).expanduser()
+            if not os.path.isfile(face_swap_image_path):
+                raise ValueError(
+                    f"Face swap image file not found: {face_swap_image_path}"
+                )
+            shutil.copyfile(
+                face_swap_image_path,
+                self._input_path / face_swap_image_path.name,
             )
-        shutil.copyfile(
-            face_swap_image_path, self._input_path / face_swap_image_path.name
-        )
-        self.face_swap_image = face_swap_image_path.name
+            face_swap_images.append(face_swap_image_path.name)
+        self.face_swap_images = face_swap_images
 
-    def _set_pose_image(self, value: str) -> None:
+    def _set_pose_images(self, value: list[str]) -> None:
         if self._input_path is None:
             raise ValueError("Input path is not set")
-        pose_image_path: pathlib.Path = pathlib.Path(value).expanduser()
-        if not os.path.isfile(pose_image_path):
-            raise ValueError(f"Pose image file not found: {pose_image_path}")
-        shutil.copyfile(
-            pose_image_path, self._input_path / pose_image_path.name
-        )
-        self.pose_image = pose_image_path.name
+        pose_images: list[str] = []
+        for v in value:
+            pose_image_path: pathlib.Path = pathlib.Path(v).expanduser()
+            if not os.path.isfile(pose_image_path):
+                raise ValueError(
+                    f"Pose image file not found: {pose_image_path}"
+                )
+            shutil.copyfile(
+                pose_image_path, self._input_path / pose_image_path.name
+            )
+            pose_images.append(pose_image_path.name)
+        self.pose_images = pose_images
+
+    def _validate_face_swap_images_and_pose_images(self) -> None:
+        if len(self.face_swap_images) != len(self.pose_images):
+            raise ValueError(
+                "Number of face swap images and pose images must be the same"
+            )
 
     @property
     def sub_prompt_count(self) -> int:
         return len(self.sub_prompts)
+
+    @property
+    def pose_and_face_swap_count(self) -> int:
+        return len(self.pose_images)
 
     @staticmethod
     def dict_factory(pairs: dict[str, Any] | Any) -> dict[str, Any] | Any:
@@ -398,8 +422,8 @@ class Config:
             system_neg_prompt=doc_dict["config"]["system_neg_prompt"],
             neg_prompts=doc_dict["config"]["neg_prompts"],
             sub_prompts=doc_dict["config"]["sub_prompts"],
-            face_swap_image=doc_dict["config"]["face_swap_image_path"],
-            pose_image=doc_dict["config"]["pose_image_path"],
+            face_swap_images=doc_dict["config"]["face_swap_image_paths"],
+            pose_images=doc_dict["config"]["pose_image_paths"],
             loop_count=doc_dict["config"].get(
                 "loop_count", DEFAULT_LOOP_COUNT
             ),
@@ -472,8 +496,8 @@ class AppManager:
                 self._args.controlnet_path,
                 self._args.system_prompt_path,
                 self._args.system_neg_prompt_path,
-                self._args.face_swap_image_path,
-                self._args.pose_image_path,
+                self._args.face_swap_image_paths,
+                self._args.pose_image_paths,
                 self._args.lora_strengths,
             ):
                 self._set_config_from_args()
@@ -482,8 +506,8 @@ class AppManager:
                     "All of the following must be provided: "
                     "--comfyui_path, --ckpt_path, --lora_paths, "
                     "--controlnet_path, --system_prompt_path, "
-                    "--system_neg_prompt_path, --face_swap_image_path, "
-                    "--pose_image_path, --lora_strengths"
+                    "--system_neg_prompt_path, --face_swap_image_paths, "
+                    "--pose_image_paths, --lora_strengths"
                 )
 
     def _set_config_from_args(self) -> None:
@@ -511,8 +535,8 @@ class AppManager:
             ),
             neg_prompts=self._get_prompts(self._args.neg_prompts_path),
             sub_prompts=self._get_prompts(self._args.sub_prompts_path),
-            face_swap_image=self._args.face_swap_image_path,
-            pose_image=self._args.pose_image_path,
+            face_swap_images=self._args.face_swap_image_paths,
+            pose_images=self._args.pose_image_paths,
             loop_count=self._args.loop_count,
             seed_generation=SeedGenerationMethod(self._args.seed_generation),
             output_path=self._args.output_path,

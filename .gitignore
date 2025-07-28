@@ -204,12 +204,13 @@ poetry.toml
 .ruff_cache/
 
 # prompt files
-system_prompt.txt
-neg_prompts.txt
-sub_prompts.txt
+*.txt
 
 # output directory
-output
+output/
+
+# input directory
+input/
 
 # TOML config file
 config.toml
