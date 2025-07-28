@@ -25,8 +25,8 @@ def main() -> None:
         subprocess.run([command, *args], shell=False)
     else:
         for config_idx, config in enumerate(manager.config.sub_configs):
-            for _ in range(config.loop_count):
-                for prompt_idx in range(config.sub_prompt_count):
+            for prompt_idx in range(config.sub_prompt_count):
+                for _ in range(config.loop_count):
                     command = shlex.quote(
                         (manager.basedir / "bin" / "generate.sh").as_posix()
                     )
