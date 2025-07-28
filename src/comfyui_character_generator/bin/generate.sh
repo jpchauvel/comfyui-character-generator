@@ -2,14 +2,15 @@
 set -euo pipefail
 
 # Check for required arguments
-if [ "$#" -ne 3 ]; then
-  echo "Usage: $0 <venv_path> <PYTHONPATH> <prompt_idx>"
+if [ "$#" -ne 4 ]; then
+  echo "Usage: $0 <venv_path> <PYTHONPATH> <config_idx> <prompt_idx>"
   exit 1
 fi
 
 VENV_PATH="$1"
 PYTHON_PATH="$2"
-PROMPT_IDX="$3"
+CONFIG_IDX="$3"
+PROMPT_IDX="$4"
 
 # Read stdin safely (non-blocking if no input piped)
 if [ -t 0 ]; then
@@ -35,4 +36,4 @@ if [ ! -f "${SCRIPT_PATH}" ]; then
 fi
 
 # Execute script with stdin as input
-printf "%s" "$stdin_input" | PYTHONPATH="${PYTHON_PATH}" python3 "${SCRIPT_PATH}" --prompt_idx "$PROMPT_IDX"
+printf "%s" "$stdin_input" | PYTHONPATH="${PYTHON_PATH}" python3 "${SCRIPT_PATH}" --config_idx "$CONFIG_IDX" --prompt_idx "$PROMPT_IDX"

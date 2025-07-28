@@ -95,6 +95,12 @@ def get_args() -> argparse.Namespace:
         description="Automated ComfyUI Character Generator.",
     )
     parser.add_argument(
+        "--config_idx",
+        type=int,
+        required=True,
+        help="Config index.",
+    )
+    parser.add_argument(
         "--prompt_idx",
         type=int,
         required=True,
@@ -119,27 +125,33 @@ def main() -> None:
         with torch.inference_mode():
             emptylatentimage = NODE_CLASS_MAPPINGS["EmptyLatentImage"]()
             emptylatentimage_5 = emptylatentimage.generate(
-                width=manager.config.width,
-                height=manager.config.height,
-                batch_size=manager.config.batch,
+                width=manager.config.sub_configs[args.config_idx].width,
+                height=manager.config.sub_configs[args.config_idx].height,
+                batch_size=manager.config.sub_configs[args.config_idx].batch,
             )
 
             checkpointloadersimple = NODE_CLASS_MAPPINGS[
                 "CheckpointLoaderSimple"
             ]()
             checkpointloadersimple_12 = checkpointloadersimple.load_checkpoint(
-                ckpt_name=manager.config.ckpt,
+                ckpt_name=manager.config.sub_configs[args.config_idx].ckpt,
             )
 
             loraloader = NODE_CLASS_MAPPINGS["LoraLoader"]()
             loraloaders: list[Any] = []
-            for idx, lora in enumerate(manager.config.loras):
+            for idx, lora in enumerate(
+                manager.config.sub_configs[args.config_idx].loras
+            ):
                 if idx == 0:
                     loraloaders.append(
                         loraloader.load_lora(
                             lora_name=lora,
-                            strength_model=manager.config.lora_strengths[idx],
-                            strength_clip=manager.config.lora_strengths[idx],
+                            strength_model=manager.config.sub_configs[
+                                args.config_idx
+                            ].lora_strengths[idx],
+                            strength_clip=manager.config.sub_configs[
+                                args.config_idx
+                            ].lora_strengths[idx],
                             model=get_value_at_index(
                                 checkpointloadersimple_12, 0
                             ),
@@ -152,8 +164,12 @@ def main() -> None:
                     loraloaders.append(
                         loraloader.load_lora(
                             lora_name=lora,
-                            strength_model=manager.config.lora_strengths[idx],
-                            strength_clip=manager.config.lora_strengths[idx],
+                            strength_model=manager.config.sub_configs[
+                                args.config_idx
+                            ].lora_strengths[idx],
+                            strength_clip=manager.config.sub_configs[
+                                args.config_idx
+                            ].lora_strengths[idx],
                             model=get_value_at_index(loraloaders[idx - 1], 0),
                             clip=get_value_at_index(loraloaders[idx - 1], 1),
                         )
@@ -163,37 +179,49 @@ def main() -> None:
 
             cliptextencode = NODE_CLASS_MAPPINGS["CLIPTextEncode"]()
             cliptextencode_6 = cliptextencode.encode(
-                text=manager.config.system_prompt,
+                text=manager.config.sub_configs[args.config_idx].system_prompt,
                 clip=get_value_at_index(last_lora, 1),
             )
 
             cliptextencode_15 = cliptextencode.encode(
-                text=manager.config.sub_prompts[args.prompt_idx],
+                text=manager.config.sub_configs[args.config_idx].sub_prompts[
+                    args.prompt_idx
+                ],
                 clip=get_value_at_index(last_lora, 1),
             )
 
             cliptextencode_7 = cliptextencode.encode(
-                text=manager.config.system_neg_prompt,
+                text=manager.config.sub_configs[
+                    args.config_idx
+                ].system_neg_prompt,
                 clip=get_value_at_index(last_lora, 1),
             )
 
             cliptextencode_31 = cliptextencode.encode(
-                text=manager.config.neg_prompts[args.prompt_idx],
+                text=manager.config.sub_configs[args.config_idx].neg_prompts[
+                    args.prompt_idx
+                ],
                 clip=get_value_at_index(last_lora, 1),
             )
 
             controlnetloader = NODE_CLASS_MAPPINGS["ControlNetLoader"]()
             controlnetloader_34 = controlnetloader.load_controlnet(
-                control_net_name=manager.config.controlnet,
+                control_net_name=manager.config.sub_configs[
+                    args.config_idx
+                ].controlnet,
             )
 
             loadimage = NODE_CLASS_MAPPINGS["LoadImage"]()
             loadimage_51 = loadimage.load_image(
-                image=manager.config.pose_images[args.prompt_idx]
+                image=manager.config.sub_configs[args.config_idx].pose_images[
+                    args.prompt_idx
+                ]
             )
 
             loadimage_56 = loadimage.load_image(
-                image=manager.config.face_swap_images[args.prompt_idx]
+                image=manager.config.sub_configs[
+                    args.config_idx
+                ].face_swap_images[args.prompt_idx]
             )
 
             conditioningconcat = NODE_CLASS_MAPPINGS["ConditioningConcat"]()
@@ -247,7 +275,13 @@ def main() -> None:
             )
 
             impactswitch_62 = impactswitch.doit(
-                select=1 if manager.config.disable_controlnet else 2,
+                select=(
+                    1
+                    if manager.config.sub_configs[
+                        args.config_idx
+                    ].disable_controlnet
+                    else 2
+                ),
                 sel_mode=False,
                 input1=get_value_at_index(conditioningconcat_18, 0),
                 input2=get_value_at_index(controlnetapplyadvanced_35, 0),
@@ -255,7 +289,13 @@ def main() -> None:
             )
 
             impactswitch_63 = impactswitch.doit(
-                select=1 if manager.config.disable_controlnet else 2,
+                select=(
+                    1
+                    if manager.config.sub_configs[
+                        args.config_idx
+                    ].disable_controlnet
+                    else 2
+                ),
                 sel_mode=False,
                 input1=get_value_at_index(conditioningconcat_33, 0),
                 input2=get_value_at_index(controlnetapplyadvanced_35, 1),
@@ -263,9 +303,9 @@ def main() -> None:
             )
 
             ksampler_3 = ksampler.sample(
-                seed=manager.config.seed,
-                steps=manager.config.steps,
-                cfg=manager.config.guidance_scale,
+                seed=manager.config.sub_configs[args.config_idx].seed,
+                steps=manager.config.sub_configs[args.config_idx].steps,
+                cfg=manager.config.sub_configs[args.config_idx].guidance_scale,
                 sampler_name="euler",
                 scheduler="normal",
                 denoise=1,
@@ -321,9 +361,13 @@ def main() -> None:
                 image_b=get_value_at_index(reactorfaceswap_57, 0),
             )
 
-            if manager.config.output_path != pathlib.Path(""):
+            if manager.config.sub_configs[
+                args.config_idx
+            ].output_path != pathlib.Path(""):
                 saveimage.output_dir = (
-                    manager.config.output_path.expanduser().as_posix()
+                    manager.config.sub_configs[args.config_idx]
+                    .output_path.expanduser()
+                    .as_posix()
                 )
             saveimage_59 = saveimage.save_images(
                 filename_prefix="ComfyUI",

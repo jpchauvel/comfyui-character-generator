@@ -4,6 +4,7 @@ import pathlib
 import random
 import shutil
 import tomllib
+from copy import deepcopy
 from dataclasses import asdict, dataclass, field
 from typing import Any, Self
 
@@ -16,9 +17,68 @@ from comfyui_character_generator.util.enums import SeedGenerationMethod
 
 
 @dataclass
-class Config:
-    comfyui_path: pathlib.Path | None = None
-    venv_path: pathlib.Path | None = None
+class PromptMixin:
+    system_prompt: str = ""
+    system_neg_prompt: str = ""
+    sub_prompts: list[str] = field(default_factory=list)
+    neg_prompts: list[str] = field(default_factory=list)
+
+    def _set_prompts(self, values: list[list[str]]) -> None:
+        if len(values[0]) != len(values[1]):
+            raise ValueError(
+                "Number of sub prompts and negative prompts must be the same"
+            )
+        self.sub_prompts = values[0]
+        self.neg_prompts = values[1]
+
+    @property
+    def sub_prompt_count(self) -> int:
+        return len(self.sub_prompts)
+
+
+@dataclass
+class ImageMixin:
+    face_swap_images: list[str] = field(default_factory=list)
+    pose_images: list[str] = field(default_factory=list)
+
+    def _set_face_swap_images(
+        self, input_path: pathlib.Path | None, value: list[str]
+    ) -> None:
+        if input_path is None:
+            raise ValueError("Input path is not set")
+        face_swap_images: list[str] = []
+        for v in value:
+            face_swap_image_path: pathlib.Path = pathlib.Path(v).expanduser()
+            if not os.path.isfile(face_swap_image_path):
+                raise ValueError(
+                    f"Face swap image file not found: {face_swap_image_path}"
+                )
+            shutil.copyfile(
+                face_swap_image_path,
+                input_path / face_swap_image_path.name,
+            )
+            face_swap_images.append(face_swap_image_path.name)
+        self.face_swap_images = face_swap_images
+
+    def _set_pose_images(
+        self, input_path: pathlib.Path | None, value: list[str]
+    ) -> None:
+        if input_path is None:
+            raise ValueError("Input path is not set")
+        pose_images: list[str] = []
+        for v in value:
+            pose_image_path: pathlib.Path = pathlib.Path(v).expanduser()
+            if not os.path.isfile(pose_image_path):
+                raise ValueError(
+                    f"Pose image file not found: {pose_image_path}"
+                )
+            shutil.copyfile(pose_image_path, input_path / pose_image_path.name)
+            pose_images.append(pose_image_path.name)
+        self.pose_images = pose_images
+
+
+@dataclass
+class BaseConfig:
     ckpt: str | None = None
     loras: list[str] = field(default_factory=list)
     controlnet: str | None = None
@@ -31,53 +91,158 @@ class Config:
     width: int = DEFAULT_WIDTH
     height: int = int(DEFAULT_WIDTH * ASPECT_RATIO[DEFAULT_ASPECT_RATIO])
     aspect_ratio: str = DEFAULT_ASPECT_RATIO
-    system_prompt: str = ""
-    system_neg_prompt: str = ""
-    neg_prompts: list[str] = field(default_factory=list)
-    sub_prompts: list[str] = field(default_factory=list)
-    face_swap_images: list[str] = field(default_factory=list)
-    pose_images: list[str] = field(default_factory=list)
     loop_count: int = DEFAULT_LOOP_COUNT
     seed_generation: SeedGenerationMethod = DEFAULT_SEED_GENERATION
     output_path: pathlib.Path = pathlib.Path("")
 
-    def __init__(self, validate: bool = True, **attrs) -> None:
-        self._neg_prompt_iter = None
-        self._sub_prompt_iter = None
-        self._input_path: pathlib.Path | None = None
+    def __init__(
+        self,
+        comfyui_path: pathlib.Path | None,
+        input_path: pathlib.Path | None,
+        validate: bool = True,
+        **attrs,
+    ) -> None:
         if validate:
-            self._set_comfyui_path(attrs["comfyui_path"])
-            self._set_venv(attrs["venv_path"])
-            self._set_ckpt(attrs["ckpt"])
-            self._set_loras_and_strengths(
-                attrs["loras"], attrs["lora_strengths"]
+            self._set_global_config(comfyui_path, **attrs)
+        else:
+            for key, value in attrs.items():
+                setattr(self, key, value)
+
+    def _set_global_config(
+        self, comfyui_path: pathlib.Path | None, **attrs
+    ) -> None:
+        self._set_ckpt(comfyui_path, attrs["ckpt"])
+        self._set_loras_and_strengths(
+            comfyui_path, attrs["loras"], attrs["lora_strengths"]
+        )
+        self._set_controlnet(comfyui_path, attrs["controlnet"])
+        self.disable_controlnet = attrs["disable_controlnet"]
+        self.steps = attrs["steps"]
+        self.seed = attrs["seed"]
+        self.guidance_scale = attrs["guidance_scale"]
+        self.batch = attrs["batch"]
+        self.aspect_ratio = attrs["aspect_ratio"]
+        self._set_resolution(attrs["width"])
+        self.loop_count = attrs["loop_count"]
+        self.seed_generation = SeedGenerationMethod(attrs["seed_generation"])
+        self.output_path = pathlib.Path(attrs["output_path"])
+
+    def _set_ckpt(self, comfyui_path: pathlib.Path | None, value: str) -> None:
+        if comfyui_path is None:
+            raise ValueError("ComfyUI path is not set")
+        ckpt_path: pathlib.Path = (
+            comfyui_path / MODEL_DIRECTORY / CHECKPOINT_DIRECTORY / value
+        ).expanduser()
+        if not os.path.isfile(ckpt_path):
+            raise ValueError(f"Checkpoint file not found: {ckpt_path}")
+        self.ckpt = value
+
+    def _set_loras_and_strengths(
+        self,
+        comfyui_path: pathlib.Path | None,
+        loras: list[str],
+        strengths: list[float],
+    ) -> None:
+        if comfyui_path is None:
+            raise ValueError("ComfyUI path is not set")
+        if len(loras) != len(strengths):
+            raise ValueError(
+                "Number of loras and lora strengths must be the same"
             )
-            self._set_controlnet(attrs["controlnet"])
-            self.disable_controlnet = attrs["disable_controlnet"]
-            self.steps = attrs["steps"]
-            self.seed = attrs["seed"]
-            self.guidance_scale = attrs["guidance_scale"]
-            self.batch = attrs["batch"]
-            self.aspect_ratio = attrs["aspect_ratio"]
-            self._set_resolution(attrs["width"])
+        for lora in loras:
+            lora_path: pathlib.Path = (
+                comfyui_path / MODEL_DIRECTORY / LORA_DIRECTORY / lora
+            ).expanduser()
+            if not os.path.isfile(lora_path):
+                raise ValueError(f"Lora file not found: {lora_path}")
+        self.loras = loras
+        self.lora_strengths = strengths
+
+    def _set_controlnet(
+        self, comfyui_path: pathlib.Path | None, value: str
+    ) -> None:
+        if comfyui_path is None:
+            raise ValueError("ComfyUI path is not set")
+        controlnet_path: pathlib.Path = (
+            comfyui_path / MODEL_DIRECTORY / CONTROLNET_DIRECTORY / value
+        ).expanduser()
+        if not os.path.isfile(controlnet_path):
+            raise ValueError(f"Controlnet file not found: {controlnet_path}")
+        self.controlnet = value
+
+    def _set_resolution(self, width: int) -> None:
+        if self.aspect_ratio is None:
+            raise ValueError("Aspect ratio is not set")
+        self.width = width
+        self.height = int(width * ASPECT_RATIO[self.aspect_ratio])
+
+
+@dataclass
+class Config(BaseConfig, PromptMixin, ImageMixin):
+    def __init__(
+        self,
+        comfyui_path: pathlib.Path | None,
+        input_path: pathlib.Path | None,
+        validate: bool = True,
+        **attrs,
+    ) -> None:
+        if validate:
+            self._set_global_config(comfyui_path, **attrs)
             self.system_prompt = attrs["system_prompt"]
             self.system_neg_prompt = attrs["system_neg_prompt"]
             self._set_prompts(
                 values=[attrs["sub_prompts"], attrs["neg_prompts"]]
             )
-            self.neg_prompts = attrs["neg_prompts"]
-            self.sub_prompts = attrs["sub_prompts"]
-            self._set_face_swap_images(attrs["face_swap_images"])
-            self._set_pose_images(attrs["pose_images"])
+            self._set_face_swap_images(input_path, attrs["face_swap_images"])
+            self._set_pose_images(input_path, attrs["pose_images"])
             self._validate_sub_prompt_length()
-            self.loop_count = attrs["loop_count"]
-            self.seed_generation = SeedGenerationMethod(
-                attrs["seed_generation"]
-            )
-            self.output_path = pathlib.Path(attrs["output_path"])
         else:
             for key, value in attrs.items():
                 setattr(self, key, value)
+
+    def _validate_sub_prompt_length(self) -> None:
+        if len(self.sub_prompts) not in (
+            len(self.face_swap_images),
+            len(self.pose_images),
+        ):
+
+            raise ValueError(
+                "Number of sub prompts, face swap images and pose images must be the same"
+            )
+
+    @classmethod
+    def from_dict_list(cls, data: list[dict[str, Any]]) -> list[Self]:
+        configs: list[Self] = []
+        for ele in data:
+            for key, value in ele.items():
+                if key == "output_path":
+                    ele[key] = pathlib.Path(value)
+            configs.append(cls(None, None, validate=False, **ele))
+        return configs
+
+
+@dataclass
+class GlobalConfig(BaseConfig):
+    comfyui_path: pathlib.Path | None = None
+    venv_path: pathlib.Path | None = None
+    sub_configs: list[Config] = field(default_factory=list)
+
+    def __init__(self, validate: bool = True, **attrs) -> None:
+        self.sub_configs = []
+        self._input_path: pathlib.Path | None = None
+        if validate:
+            self._set_comfyui_path(attrs["comfyui_path"])
+            self._set_venv(attrs["venv_path"])
+            attrs["comfyui_path"] = self.comfyui_path
+            attrs["venv_path"] = self.venv_path
+        else:
+            for key, value in attrs.items():
+                setattr(self, key, value)
+        attrs["input_path"] = self._input_path
+        super().__init__(
+            validate=False,
+            **attrs,
+        )
 
     def _set_comfyui_path(self, value: str) -> None:
         comfyui_path: pathlib.Path = pathlib.Path(value).expanduser()
@@ -93,109 +258,6 @@ class Config:
         if not os.path.isdir(venv_path):
             raise ValueError(f"Environment directory not found: {venv_path}")
         self.venv_path = venv_path
-
-    def _set_ckpt(self, value: str) -> None:
-        if self.comfyui_path is None:
-            raise ValueError("ComfyUI path is not set")
-        ckpt_path: pathlib.Path = (
-            self.comfyui_path / MODEL_DIRECTORY / CHECKPOINT_DIRECTORY / value
-        ).expanduser()
-        if not os.path.isfile(ckpt_path):
-            raise ValueError(f"Checkpoint file not found: {ckpt_path}")
-        self.ckpt = value
-
-    def _set_loras_and_strengths(
-        self, loras: list[str], strengths: list[float]
-    ) -> None:
-        if self.comfyui_path is None:
-            raise ValueError("ComfyUI path is not set")
-        if len(loras) != len(strengths):
-            raise ValueError(
-                "Number of loras and lora strengths must be the same"
-            )
-        for lora in loras:
-            lora_path: pathlib.Path = (
-                self.comfyui_path / MODEL_DIRECTORY / LORA_DIRECTORY / lora
-            ).expanduser()
-            if not os.path.isfile(lora_path):
-                raise ValueError(f"Lora file not found: {lora_path}")
-        self.loras = loras
-        self.lora_strengths = strengths
-
-    def _set_controlnet(self, value: str) -> None:
-        if self.comfyui_path is None:
-            raise ValueError("ComfyUI path is not set")
-        controlnet_path: pathlib.Path = (
-            self.comfyui_path / MODEL_DIRECTORY / CONTROLNET_DIRECTORY / value
-        ).expanduser()
-        if not os.path.isfile(controlnet_path):
-            raise ValueError(f"Controlnet file not found: {controlnet_path}")
-        self.controlnet = value
-
-    def _set_resolution(self, width: int) -> None:
-        if self.aspect_ratio is None:
-            raise ValueError("Aspect ratio is not set")
-        self.width = width
-        self.height = int(width * ASPECT_RATIO[self.aspect_ratio])
-
-    def _set_prompts(self, values: list[list[str]]) -> None:
-        if len(values[0]) != len(values[1]):
-            raise ValueError(
-                "Number of sub prompts and negative prompts must be the same"
-            )
-        self.sub_prompts = values[0]
-        self.neg_prompts = values[1]
-
-    def _set_face_swap_images(self, value: list[str]) -> None:
-        if self._input_path is None:
-            raise ValueError("Input path is not set")
-        face_swap_images: list[str] = []
-        for v in value:
-            face_swap_image_path: pathlib.Path = pathlib.Path(v).expanduser()
-            if not os.path.isfile(face_swap_image_path):
-                raise ValueError(
-                    f"Face swap image file not found: {face_swap_image_path}"
-                )
-            shutil.copyfile(
-                face_swap_image_path,
-                self._input_path / face_swap_image_path.name,
-            )
-            face_swap_images.append(face_swap_image_path.name)
-        self.face_swap_images = face_swap_images
-
-    def _set_pose_images(self, value: list[str]) -> None:
-        if self._input_path is None:
-            raise ValueError("Input path is not set")
-        pose_images: list[str] = []
-        for v in value:
-            pose_image_path: pathlib.Path = pathlib.Path(v).expanduser()
-            if not os.path.isfile(pose_image_path):
-                raise ValueError(
-                    f"Pose image file not found: {pose_image_path}"
-                )
-            shutil.copyfile(
-                pose_image_path, self._input_path / pose_image_path.name
-            )
-            pose_images.append(pose_image_path.name)
-        self.pose_images = pose_images
-
-    def _validate_sub_prompt_length(self) -> None:
-        if len(self.sub_prompts) not in (
-            len(self.face_swap_images),
-            len(self.pose_images),
-        ):
-
-            raise ValueError(
-                "Number of sub prompts, face swap images and pose images must be the same"
-            )
-
-    @property
-    def sub_prompt_count(self) -> int:
-        return len(self.sub_prompts)
-
-    @property
-    def pose_and_face_swap_count(self) -> int:
-        return len(self.pose_images)
 
     @staticmethod
     def dict_factory(pairs: dict[str, Any] | Any) -> dict[str, Any] | Any:
@@ -214,7 +276,9 @@ class Config:
         for key, value in data.items():
             if key in ("comfyui_path", "venv_path", "output_path"):
                 data[key] = pathlib.Path(value)
-        return cls(validate=False, **data)
+        config = cls(validate=False, **data)
+        config.sub_configs = Config.from_dict_list(data.get("sub_configs", []))
+        return config
 
     def dump(self) -> str:
         return json.dumps(asdict(self), default=self.dict_factory)
@@ -228,42 +292,60 @@ class Config:
         with open(config_path, "rb") as fd:
             doc_dict: dict[str, Any] = tomllib.load(fd)
 
-        config = cls(
-            comfyui_path=pathlib.Path(doc_dict["config"]["comfyui_path"]),
-            venv_path=pathlib.Path(doc_dict["config"]["venv_path"]),
-            ckpt=doc_dict["config"]["ckpt_path"],
-            loras=doc_dict["config"]["lora_paths"],
-            lora_strengths=doc_dict["config"]["lora_strengths"],
-            controlnet=doc_dict["config"]["controlnet_path"],
-            disable_controlnet=doc_dict["config"].get(
+        config_attrs: dict[str, Any] = dict(
+            comfyui_path=pathlib.Path(doc_dict["global"]["comfyui_path"]),
+            venv_path=pathlib.Path(doc_dict["global"]["venv_path"]),
+            ckpt=doc_dict["global"]["ckpt_path"],
+            loras=doc_dict["global"]["lora_paths"],
+            lora_strengths=doc_dict["global"]["lora_strengths"],
+            controlnet=doc_dict["global"]["controlnet_path"],
+            disable_controlnet=doc_dict["global"].get(
                 "disable_controlnet", DEFAULT_DISABLE_CONTROLNET
             ),
-            steps=doc_dict["config"].get("steps", DEFAULT_STEPS),
-            seed=doc_dict["config"].get("seed", random.randint(1, 2**64)),
-            guidance_scale=doc_dict["config"].get(
+            steps=doc_dict["global"].get("steps", DEFAULT_STEPS),
+            seed=doc_dict["global"].get("seed", random.randint(1, 2**64)),
+            guidance_scale=doc_dict["global"].get(
                 "guidance_scale", DEFAULT_GUIDANCE_SCALE
             ),
-            batch=doc_dict["config"].get("batch", DEFAULT_BATCH),
-            width=doc_dict["config"].get("width", DEFAULT_WIDTH),
-            aspect_ratio=doc_dict["config"].get(
+            batch=doc_dict["global"].get("batch", DEFAULT_BATCH),
+            width=doc_dict["global"].get("width", DEFAULT_WIDTH),
+            aspect_ratio=doc_dict["global"].get(
                 "aspect_ratio", DEFAULT_ASPECT_RATIO
             ),
-            system_prompt=doc_dict["config"]["system_prompt"],
-            system_neg_prompt=doc_dict["config"]["system_neg_prompt"],
-            neg_prompts=doc_dict["config"]["neg_prompts"],
-            sub_prompts=doc_dict["config"]["sub_prompts"],
-            face_swap_images=doc_dict["config"]["face_swap_image_paths"],
-            pose_images=doc_dict["config"]["pose_image_paths"],
-            loop_count=doc_dict["config"].get(
+            system_prompt=doc_dict["global"]["system_prompt"],
+            system_neg_prompt=doc_dict["global"]["system_neg_prompt"],
+            loop_count=doc_dict["global"].get(
                 "loop_count", DEFAULT_LOOP_COUNT
             ),
             seed_generation=SeedGenerationMethod(
-                doc_dict["config"].get(
+                doc_dict["global"].get(
                     "seed_generation", DEFAULT_SEED_GENERATION
                 )
             ),
             output_path=pathlib.Path(
-                doc_dict["config"].get("output_path", "")
+                doc_dict["global"].get("output_path", "")
             ),
         )
+        config = cls(**config_attrs)
+        sub_doc_dict_keys: list[str] = [
+            k for k in doc_dict.keys() if k.startswith("config")
+        ]
+        for key in sub_doc_dict_keys:
+            sub_config_attrs: dict[str, Any] = deepcopy(config_attrs)
+            sub_config_attrs.update(
+                dict(
+                    neg_prompts=doc_dict[key]["neg_prompts"],
+                    sub_prompts=doc_dict[key]["sub_prompts"],
+                    face_swap_images=doc_dict[key]["face_swap_image_paths"],
+                    pose_images=doc_dict[key]["pose_image_paths"],
+                )
+            )
+            config.sub_configs.append(
+                Config(input_path=config.input_path, **sub_config_attrs)
+            )
+
         return config
+
+    @property
+    def input_path(self) -> pathlib.Path | None:
+        return self._input_path
