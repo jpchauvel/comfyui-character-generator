@@ -29,7 +29,7 @@ fi
 . "${VENV_PATH}/bin/activate"
 
 # Check if script exists
-SCRIPT_PATH="src/comfyui_character_generator/generate.py"
+SCRIPT_PATH="${PYTHON_PATH}/comfyui_character_generator/generate.py"
 if [ ! -f "${SCRIPT_PATH}" ]; then
   echo "Error: Script not found at ${SCRIPT_PATH}"
   exit 1

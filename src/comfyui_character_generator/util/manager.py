@@ -26,7 +26,6 @@ class AppManager:
                         "Both --comfyui_path and --venv_path must be provided"
                     )
                 self.config = GlobalConfig(
-                    validate=False,
                     comfyui_path=self._args.comfyui_path,
                     venv_path=self._args.venv_path,
                 )
