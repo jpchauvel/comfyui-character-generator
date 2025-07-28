@@ -205,9 +205,7 @@ def main() -> None:
             )
 
             conditioningconcat = NODE_CLASS_MAPPINGS["ConditioningConcat"]()
-            openposepreprocessor = NODE_CLASS_MAPPINGS[
-                "OpenposePreprocessor"
-            ]()
+            dwpreprocessor = NODE_CLASS_MAPPINGS["DWPreprocessor"]()
             controlnetapplyadvanced = NODE_CLASS_MAPPINGS[
                 "ControlNetApplyAdvanced"
             ]()
@@ -232,11 +230,13 @@ def main() -> None:
                 conditioning_from=get_value_at_index(cliptextencode_31, 0),
             )
 
-            openposepreprocessor_54 = openposepreprocessor.estimate_pose(
+            dwpreprocessor_65 = dwpreprocessor.estimate_pose(
                 detect_hand="disable",
                 detect_body="enable",
                 detect_face="enable",
                 resolution=512,
+                bbox_detector="yolox_l.onnx",
+                pose_estimator="dw-ll_ucoco_384_bs5.torchscript.pt",
                 scale_stick_for_xinsr_cn="disable",
                 image=get_value_at_index(loadimage_51, 0),
             )
@@ -249,7 +249,7 @@ def main() -> None:
                     positive=get_value_at_index(conditioningconcat_18, 0),
                     negative=get_value_at_index(conditioningconcat_33, 0),
                     control_net=get_value_at_index(controlnetloader_34, 0),
-                    image=get_value_at_index(openposepreprocessor_54, 0),
+                    image=get_value_at_index(dwpreprocessor_65, 0),
                     vae=get_value_at_index(checkpointloadersimple_12, 2),
                 )
             )

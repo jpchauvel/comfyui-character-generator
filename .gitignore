@@ -213,6 +213,6 @@ output/
 input/
 
 # TOML config file
-config.toml
+config*.toml
 
 # End of https://www.toptal.com/developers/gitignore/api/python,macos
