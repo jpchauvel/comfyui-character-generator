@@ -35,3 +35,5 @@ It will prompt with all the necessary information.
 ```sh
 uvx --from git+https://github.com/jpchauvel/comfyui-character-generator comfyui-character-generator --install_nodes --confyui_path /path/to/comfyui --venv_path relative/path/to/venv
 ```
+
+Take a look at the [sample configuration file](/config.toml.example).
