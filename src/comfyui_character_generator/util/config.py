@@ -17,9 +17,13 @@ from comfyui_character_generator.util.enums import SeedGenerationMethod
 
 
 @dataclass
-class PromptMixin:
+class SystemPromptMixin:
     system_prompt: str = ""
     system_neg_prompt: str = ""
+
+
+@dataclass
+class PromptMixin(SystemPromptMixin):
     sub_prompts: list[str] = field(default_factory=list)
     neg_prompts: list[str] = field(default_factory=list)
 
@@ -222,7 +226,7 @@ class Config(BaseConfig, PromptMixin, ImageMixin):
 
 
 @dataclass
-class GlobalConfig(BaseConfig):
+class GlobalConfig(BaseConfig, SystemPromptMixin):
     comfyui_path: pathlib.Path | None = None
     venv_path: pathlib.Path | None = None
     sub_configs: list[Config] = field(default_factory=list)
@@ -233,6 +237,8 @@ class GlobalConfig(BaseConfig):
         if validate:
             self._set_comfyui_path(attrs["comfyui_path"])
             self._set_venv(attrs["venv_path"])
+            self.system_prompt = attrs["system_prompt"]
+            self.system_neg_prompt = attrs["system_neg_prompt"]
             attrs["comfyui_path"] = self.comfyui_path
             attrs["venv_path"] = self.venv_path
         else:
@@ -312,6 +318,8 @@ class GlobalConfig(BaseConfig):
             aspect_ratio=doc_dict["global"].get(
                 "aspect_ratio", DEFAULT_ASPECT_RATIO
             ),
+            system_prompt=doc_dict["global"].get("system_prompt", ""),
+            system_neg_prompt=doc_dict["global"].get("system_neg_prompt", ""),
             loop_count=doc_dict["global"].get(
                 "loop_count", DEFAULT_LOOP_COUNT
             ),
@@ -332,12 +340,48 @@ class GlobalConfig(BaseConfig):
             sub_config_attrs: dict[str, Any] = deepcopy(config_attrs)
             sub_config_attrs.update(
                 dict(
-                    system_prompt=doc_dict[key]["system_prompt"],
-                    system_neg_prompt=doc_dict[key]["system_neg_prompt"],
+                    ckpt=doc_dict[key].get("ckpt_path", config.ckpt),
+                    loras=doc_dict[key].get("lora_paths", config.loras),
+                    lora_strengths=doc_dict[key].get(
+                        "lora_strengths", config.lora_strengths
+                    ),
+                    controlnet=doc_dict[key].get(
+                        "controlnet_path", config.controlnet
+                    ),
+                    disable_controlnet=doc_dict[key].get(
+                        "disable_controlnet", config.disable_controlnet
+                    ),
+                    steps=doc_dict[key].get("steps", config.steps),
+                    seed=doc_dict[key].get("seed", config.seed),
+                    guidance_scale=doc_dict[key].get(
+                        "guidance_scale", config.guidance_scale
+                    ),
+                    batch=doc_dict[key].get("batch", config.batch),
+                    width=doc_dict[key].get("width", config.width),
+                    aspect_ratio=doc_dict[key].get(
+                        "aspect_ratio", config.aspect_ratio
+                    ),
+                    system_prompt=doc_dict[key].get(
+                        "system_prompt", config.system_prompt
+                    ),
+                    system_neg_prompt=doc_dict[key].get(
+                        "system_neg_prompt", config.system_neg_prompt
+                    ),
                     neg_prompts=doc_dict[key]["neg_prompts"],
                     sub_prompts=doc_dict[key]["sub_prompts"],
                     face_swap_images=doc_dict[key]["face_swap_image_paths"],
                     pose_images=doc_dict[key]["pose_image_paths"],
+                    loop_count=doc_dict[key].get(
+                        "loop_count", config.loop_count
+                    ),
+                    seed_generation=SeedGenerationMethod(
+                        doc_dict[key].get(
+                            "seed_generation", config.seed_generation
+                        )
+                    ),
+                    output_path=pathlib.Path(
+                        doc_dict[key].get("output_path", config.output_path)
+                    ),
                 )
             )
             config.sub_configs.append(

@@ -23,6 +23,8 @@ class TestConfig(unittest.TestCase):
             batch=2,
             width=512,
             aspect_ratio="1:1",
+            system_prompt ="this is a system prompt",
+            system_neg_prompt="this is a system negative prompt",
             loop_count=1,
             seed_generation=1,
         )
@@ -43,6 +45,8 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(config.batch, 2)
         self.assertEqual(config.width, 512)
         self.assertEqual(config.aspect_ratio, "1:1")
+        self.assertEqual(config.system_prompt, "this is a system prompt")
+        self.assertEqual(config.system_neg_prompt, "this is a system negative prompt")
         self.assertEqual(config.loop_count, 1)
         self.assertEqual(config.seed_generation, 1)
 
