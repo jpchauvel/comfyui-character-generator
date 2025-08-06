@@ -209,6 +209,7 @@ class TestConfig(unittest.TestCase):
             "pose_images": ["pose1.png"],
             "pose_detection_type": "openpose",
             "loop_count": 1,
+            "pose_detection_type": 0,
             "seed_generation": 1,
             "output_path": "/tmp/output",
             "comfyui_path": "/tmp/comfyui",

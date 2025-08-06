@@ -41,6 +41,7 @@ class AppManager:
                 self._args.ckpt_path,
                 self._args.lora_paths,
                 self._args.controlnet_path,
+                self._args.upscaler_path,
                 self._args.system_prompt_path,
                 self._args.system_neg_prompt_path,
                 self._args.face_swap_image_paths,
@@ -52,9 +53,10 @@ class AppManager:
                 raise ValueError(
                     "All of the following must be provided: "
                     "--comfyui_path, --ckpt_path, --lora_paths, "
-                    "--controlnet_path, --system_prompt_path, "
-                    "--system_neg_prompt_path, --face_swap_image_paths, "
-                    "--pose_image_paths, --lora_strengths"
+                    "--controlnet_path, --upscaler_path, "
+                    "--system_prompt_path, --system_neg_prompt_path, "
+                    "--face_swap_image_paths, --pose_image_paths, "
+                    "--lora_strengths"
                 )
 
     def _set_config_from_args(self) -> None:

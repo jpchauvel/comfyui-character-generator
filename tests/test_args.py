@@ -11,6 +11,10 @@ class TestArgs(unittest.TestCase):
         with mock.patch.object(sys, "argv", test_argv):
             parsed = args_module.get_args()
             self.assertIsNotNone(parsed)
+            self.assertEqual(
+                parsed.pose_detection_type,
+                args_module.DEFAULT_POSE_DETECTION_TYPE,
+            )
             self.assertEqual(parsed.venv_path, args_module.DEFAULT_VENV_PATH)
             self.assertEqual(parsed.steps, args_module.DEFAULT_STEPS)
             self.assertEqual(

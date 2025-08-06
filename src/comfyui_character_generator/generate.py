@@ -288,7 +288,7 @@ def main() -> None:
                 easy_anythingindexswitch.index_switch(
                     index=manager.config.sub_configs[
                         args.config_idx
-                    ].pose_detection_type,
+                    ].pose_detection_type.value,
                     value0=get_value_at_index(openposepreprocessor_66, 0),
                     value1=get_value_at_index(lineartpreprocessor_67, 0),
                     value2=get_value_at_index(depthanythingpreprocessor_68, 0),

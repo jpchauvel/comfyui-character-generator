@@ -90,7 +90,7 @@ class BaseConfig:
     controlnet: str | None = None
     upscaler: str | None = None
     disable_controlnet: bool = DEFAULT_DISABLE_CONTROLNET
-    pose_detection_type: int = DEFAULT_POSE_DETECTION_TYPE
+    pose_detection_type: PoseDetectionType = DEFAULT_POSE_DETECTION_TYPE
     steps: int = DEFAULT_STEPS
     seed: int = SEED
     guidance_scale: float = DEFAULT_GUIDANCE_SCALE
@@ -113,8 +113,7 @@ class BaseConfig:
         if validate:
             self._set_global_config(comfyui_path, **attrs)
         else:
-            for key, value in attrs.items():
-                setattr(self, key, value)
+            self._set_attrs(**attrs)
 
     def _set_global_config(
         self, comfyui_path: pathlib.Path | None, **attrs
@@ -126,7 +125,9 @@ class BaseConfig:
         self._set_controlnet(comfyui_path, attrs["controlnet"])
         self._set_upscaler(comfyui_path, attrs["upscaler"])
         self.disable_controlnet = attrs["disable_controlnet"]
-        self.pose_detection_type = attrs["pose_detection_type"]
+        self.pose_detection_type = PoseDetectionType(
+            attrs["pose_detection_type"]
+        )
         self.steps = attrs["steps"]
         self.seed = attrs["seed"]
         self.guidance_scale = attrs["guidance_scale"]
@@ -136,6 +137,16 @@ class BaseConfig:
         self.loop_count = attrs["loop_count"]
         self.seed_generation = SeedGenerationMethod(attrs["seed_generation"])
         self.output_path = pathlib.Path(attrs["output_path"])
+
+    def _set_attrs(self, **attrs) -> None:
+        for key, value in attrs.items():
+            match key:
+                case "pose_detection_type":
+                    self.pose_detection_type = PoseDetectionType(value)
+                case "seed_generation":
+                    self.seed_generation = SeedGenerationMethod(value)
+                case _:
+                    setattr(self, key, value)
 
     def _set_ckpt(self, comfyui_path: pathlib.Path | None, value: str) -> None:
         if comfyui_path is None:
@@ -219,8 +230,7 @@ class Config(BaseConfig, PromptMixin, ImageMixin):
             self._set_pose_images(input_path, attrs["pose_images"])
             self._validate_sub_prompt_length()
         else:
-            for key, value in attrs.items():
-                setattr(self, key, value)
+            self._set_attrs(**attrs)
 
     def _validate_sub_prompt_length(self) -> None:
         if len(self.sub_prompts) not in (
