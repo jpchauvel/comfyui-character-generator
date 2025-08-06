@@ -55,9 +55,10 @@ clone_and_install() {
 }
 
 # Repositories to clone
-clone_and_install "git@github.com:Fannovel16/comfyui_controlnet_aux.git" "comfyui_controlnet_aux"
 clone_and_install "git@github.com:rgthree/rgthree-comfy.git" "rgthree-comfy"
 clone_and_install "git@github.com:yolain/ComfyUI-Easy-Use.git" "comfyui-easy-use"
+clone_and_install "git@github.com:ssitu/ComfyUI_UltimateSDUpscale.git" "comfyui_ultimatesdupscale"
+clone_and_install "git@github.com:Fannovel16/comfyui_controlnet_aux.git" "comfyui_controlnet_aux"
 
 # Return to original directory
 popd > /dev/null
