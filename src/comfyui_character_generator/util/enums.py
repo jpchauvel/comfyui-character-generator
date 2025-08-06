@@ -13,6 +13,7 @@ class PoseDetectionType(IntEnum):
     REALISTIC_LINEART = auto()
     DEPTH = auto()
 
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        super().__init__(*args, **kwargs)
-        self._value_ -= 1
+    def __new__(cls: type, value: int) -> Any:
+        member: IntEnum = int.__new__(cls)
+        member._value_ = value - 1
+        return member
