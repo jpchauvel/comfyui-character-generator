@@ -28,6 +28,8 @@ class AppManager:
                 self.config = GlobalConfig(
                     comfyui_path=self._args.comfyui_path,
                     venv_path=self._args.venv_path,
+                    system_prompt="",
+                    system_neg_prompt="",
                 )
                 self._should_install_nodes = True
             elif self._args.config_path is not None:
