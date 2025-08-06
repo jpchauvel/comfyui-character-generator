@@ -284,6 +284,12 @@ def main() -> None:
                 image=get_value_at_index(loadimage_51, 0),
             )
 
+            print(
+                "pose_detection_type:",
+                manager.config.sub_configs[
+                    args.config_idx
+                ].pose_detection_type.value,
+            )
             easy_anythingindexswitch_71 = (
                 easy_anythingindexswitch.index_switch(
                     index=manager.config.sub_configs[

@@ -14,6 +14,7 @@ class PoseDetectionType(IntEnum):
     DEPTH = auto()
 
     def __new__(cls: type, value: int) -> Any:
-        member: IntEnum = int.__new__(cls)
-        member._value_ = value - 1
+        value -= 1
+        member: IntEnum = int.__new__(cls, value)
+        member._value_ = value
         return member

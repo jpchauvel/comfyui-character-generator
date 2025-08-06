@@ -207,7 +207,6 @@ class TestConfig(unittest.TestCase):
             "sub_prompts": ["sub1"],
             "face_swap_images": ["face1.png"],
             "pose_images": ["pose1.png"],
-            "pose_detection_type": "openpose",
             "loop_count": 1,
             "pose_detection_type": 0,
             "seed_generation": 1,
@@ -225,12 +224,10 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(loaded.ckpt, "model.safetensors")
         self.assertEqual(loaded.upscaler, "upscaler.safetensors")
 
-    def test_global_config_dict_factory(self):
+    def test_global_default_dict_value(self):
         path = pathlib.Path("/tmp/foo")
-        result = GlobalConfig.dict_factory({"foo": path, "bar": 1})
-        self.assertEqual(result["foo"], "/tmp/foo")
-        self.assertEqual(result["bar"], 1)
-        self.assertEqual(GlobalConfig.dict_factory(path), "/tmp/foo")
+        result = GlobalConfig.default_dict_value(path)
+        self.assertEqual(result, "/tmp/foo")
 
     @mock.patch(
         "builtins.open", new_callable=mock.mock_open, read_data=b"fake toml"

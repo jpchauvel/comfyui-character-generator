@@ -294,16 +294,9 @@ class GlobalConfig(BaseConfig, SystemPromptMixin):
         self.venv_path = venv_path
 
     @staticmethod
-    def dict_factory(pairs: dict[str, Any] | Any) -> dict[str, Any] | Any:
-        if isinstance(pairs, pathlib.Path):
-            return pairs.as_posix()
-        converted: dict[str, Any] = {}
-        for key, value in pairs.items():
-            if isinstance(value, pathlib.Path):
-                converted[key] = value.as_posix()
-            else:
-                converted[key] = value
-        return converted
+    def default_dict_value(value: Any) -> Any:
+        if isinstance(value, pathlib.Path):
+            return value.as_posix()
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Self:
@@ -315,7 +308,7 @@ class GlobalConfig(BaseConfig, SystemPromptMixin):
         return config
 
     def dump(self) -> str:
-        return json.dumps(asdict(self), default=self.dict_factory)
+        return json.dumps(asdict(self), default=self.default_dict_value)
 
     @classmethod
     def load(cls, data: str) -> Self:
