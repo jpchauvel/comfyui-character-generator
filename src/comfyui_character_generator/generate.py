@@ -250,6 +250,7 @@ def main() -> None:
             easy_cleangpuused = NODE_CLASS_MAPPINGS["easy cleanGpuUsed"]()
             easy_clearcacheall = NODE_CLASS_MAPPINGS["easy clearCacheAll"]()
             ultimatesdupscale = NODE_CLASS_MAPPINGS["UltimateSDUpscale"]()
+            reactorfaceswap = NODE_CLASS_MAPPINGS["ReActorFaceSwap"]()
             saveimage = NODE_CLASS_MAPPINGS["SaveImage"]()
 
             conditioningconcat_18 = conditioningconcat.concat(
