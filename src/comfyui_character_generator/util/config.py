@@ -11,9 +11,11 @@ from typing import Any, Self
 from comfyui_character_generator.util.constants import (
     ASPECT_RATIO, CHECKPOINT_DIRECTORY, CONTROLNET_DIRECTORY,
     DEFAULT_ASPECT_RATIO, DEFAULT_BATCH, DEFAULT_DISABLE_CONTROLNET,
-    DEFAULT_GUIDANCE_SCALE, DEFAULT_LOOP_COUNT, DEFAULT_SEED_GENERATION,
-    DEFAULT_STEPS, DEFAULT_WIDTH, LORA_DIRECTORY, MODEL_DIRECTORY, SEED)
-from comfyui_character_generator.util.enums import SeedGenerationMethod
+    DEFAULT_GUIDANCE_SCALE, DEFAULT_LOOP_COUNT, DEFAULT_POSE_DETECTION_TYPE,
+    DEFAULT_SEED_GENERATION, DEFAULT_STEPS, DEFAULT_WIDTH, LORA_DIRECTORY,
+    MODEL_DIRECTORY, SEED, UPSCALER_DIRECTORY)
+from comfyui_character_generator.util.enums import (PoseDetectionType,
+                                                    SeedGenerationMethod)
 
 
 @dataclass
@@ -86,7 +88,9 @@ class BaseConfig:
     ckpt: str | None = None
     loras: list[str] = field(default_factory=list)
     controlnet: str | None = None
+    upscaler: str | None = None
     disable_controlnet: bool = DEFAULT_DISABLE_CONTROLNET
+    pose_detection_type: int = DEFAULT_POSE_DETECTION_TYPE
     steps: int = DEFAULT_STEPS
     seed: int = SEED
     guidance_scale: float = DEFAULT_GUIDANCE_SCALE
@@ -120,7 +124,9 @@ class BaseConfig:
             comfyui_path, attrs["loras"], attrs["lora_strengths"]
         )
         self._set_controlnet(comfyui_path, attrs["controlnet"])
+        self._set_upscaler(comfyui_path, attrs["upscaler"])
         self.disable_controlnet = attrs["disable_controlnet"]
+        self.pose_detection_type = attrs["pose_detection_type"]
         self.steps = attrs["steps"]
         self.seed = attrs["seed"]
         self.guidance_scale = attrs["guidance_scale"]
@@ -173,6 +179,18 @@ class BaseConfig:
         if not os.path.isfile(controlnet_path):
             raise ValueError(f"Controlnet file not found: {controlnet_path}")
         self.controlnet = value
+
+    def _set_upscaler(
+        self, comfyui_path: pathlib.Path | None, value: str
+    ) -> None:
+        if comfyui_path is None:
+            raise ValueError("ComfyUI path is not set")
+        upscaler_path: pathlib.Path = (
+            comfyui_path / MODEL_DIRECTORY / UPSCALER_DIRECTORY / value
+        ).expanduser()
+        if not os.path.isfile(upscaler_path):
+            raise ValueError(f"Upscaler file not found: {upscaler_path}")
+        self.upscaler = value
 
     def _set_resolution(self, width: int) -> None:
         if self.aspect_ratio is None:
@@ -305,8 +323,14 @@ class GlobalConfig(BaseConfig, SystemPromptMixin):
             loras=doc_dict["global"]["lora_paths"],
             lora_strengths=doc_dict["global"]["lora_strengths"],
             controlnet=doc_dict["global"]["controlnet_path"],
+            upscaler=doc_dict["global"]["upscaler_path"],
             disable_controlnet=doc_dict["global"].get(
                 "disable_controlnet", DEFAULT_DISABLE_CONTROLNET
+            ),
+            pose_detection_type=PoseDetectionType(
+                doc_dict["global"].get(
+                    "pose_detection_type", DEFAULT_POSE_DETECTION_TYPE
+                )
             ),
             steps=doc_dict["global"].get("steps", DEFAULT_STEPS),
             seed=doc_dict["global"].get("seed", random.randint(1, 2**64)),
@@ -348,8 +372,16 @@ class GlobalConfig(BaseConfig, SystemPromptMixin):
                     controlnet=doc_dict[key].get(
                         "controlnet_path", config.controlnet
                     ),
+                    upscaler=doc_dict[key].get(
+                        "upscaler_path", config.upscaler
+                    ),
                     disable_controlnet=doc_dict[key].get(
                         "disable_controlnet", config.disable_controlnet
+                    ),
+                    pose_detection_type=PoseDetectionType(
+                        doc_dict[key].get(
+                            "pose_detection_type", config.pose_detection_type
+                        )
                     ),
                     steps=doc_dict[key].get("steps", config.steps),
                     seed=doc_dict[key].get("seed", config.seed),

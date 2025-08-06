@@ -3,8 +3,10 @@ import sys
 
 from comfyui_character_generator.util.constants import (
     ASPECT_RATIO, DEFAULT_ASPECT_RATIO, DEFAULT_BATCH, DEFAULT_GUIDANCE_SCALE,
-    DEFAULT_LOOP_COUNT, DEFAULT_SEED_GENERATION, DEFAULT_STEPS,
-    DEFAULT_VENV_PATH, DEFAULT_WIDTH, SEED)
+    DEFAULT_LOOP_COUNT, DEFAULT_POSE_DETECTION_TYPE, DEFAULT_SEED_GENERATION,
+    DEFAULT_STEPS, DEFAULT_VENV_PATH, DEFAULT_WIDTH, SEED)
+from comfyui_character_generator.util.enums import (PoseDetectionType,
+                                                    SeedGenerationMethod)
 
 
 def get_args() -> argparse.Namespace:
@@ -32,14 +34,14 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         "--ckpt_path",
         default=None,
-        help="Single .safetensors checkpoint file. Relative to checkpoint directory.",
+        help="Single .safetensors checkpoint file. Relative to checkpoints directory.",
     )
     parser.add_argument(
         "--lora_paths",
         nargs="*",
         type=str,
         default=[],
-        help="Paths to .safetensors files. Relative to lora directory.",
+        help="Paths to LoRA .safetensors files. Relative to loras directory.",
     )
     parser.add_argument(
         "--controlnet_path",
@@ -48,9 +50,22 @@ def get_args() -> argparse.Namespace:
         help="Path to ControlNet .safetensors file. Relative to controlnet directory.",
     )
     parser.add_argument(
+        "--upscaler_path",
+        type=str,
+        default=None,
+        help="Path to Upscaler model .safetensors file. Relative to upscale_models directory.",
+    )
+    parser.add_argument(
         "--disable_controlnet",
         action="store_true",
         help="Disable ControlNet.",
+    )
+    parser.add_argument(
+        "--pose_detection_type",
+        type=str,
+        default=DEFAULT_POSE_DETECTION_TYPE,
+        choices=PoseDetectionType.__members__.values(),
+        help="Pose detection type. OpenPose: 0, Realistic LineArt: 1, Depth: 2.",
     )
     parser.add_argument(
         "--steps",
@@ -140,7 +155,8 @@ def get_args() -> argparse.Namespace:
         "--seed_generation",
         type=int,
         default=DEFAULT_SEED_GENERATION,
-        help="Seed generation method (1: Increment, 2: Decrement, 3: Random).",
+        choices=SeedGenerationMethod.__members__.values(),
+        help="Seed generation method. Increment: 1, Decrement: 2, Random: 3.",
     )
     parser.add_argument(
         "--output_path",

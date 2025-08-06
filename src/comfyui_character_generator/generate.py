@@ -1,6 +1,7 @@
 import argparse
 import os
 import pathlib
+import random
 import sys
 from typing import Any, Mapping, Sequence, Union
 
@@ -224,8 +225,22 @@ def main() -> None:
                 ].face_swap_images[args.prompt_idx]
             )
 
+            upscalemodelloader = NODE_CLASS_MAPPINGS["UpscaleModelLoader"]()
+            upscalemodelloader_76 = upscalemodelloader.load_model(
+                model_name=manager.config.sub_configs[args.config_idx].upscaler
+            )
+
             conditioningconcat = NODE_CLASS_MAPPINGS["ConditioningConcat"]()
-            dwpreprocessor = NODE_CLASS_MAPPINGS["DWPreprocessor"]()
+            openposepreprocessor = NODE_CLASS_MAPPINGS[
+                "OpenposePreprocessor"
+            ]()
+            lineartpreprocessor = NODE_CLASS_MAPPINGS["LineArtPreprocessor"]()
+            depthanythingpreprocessor = NODE_CLASS_MAPPINGS[
+                "DepthAnythingPreprocessor"
+            ]()
+            easy_anythingindexswitch = NODE_CLASS_MAPPINGS[
+                "easy anythingIndexSwitch"
+            ]()
             controlnetapplyadvanced = NODE_CLASS_MAPPINGS[
                 "ControlNetApplyAdvanced"
             ]()
@@ -234,10 +249,7 @@ def main() -> None:
             vaedecode = NODE_CLASS_MAPPINGS["VAEDecode"]()
             easy_cleangpuused = NODE_CLASS_MAPPINGS["easy cleanGpuUsed"]()
             easy_clearcacheall = NODE_CLASS_MAPPINGS["easy clearCacheAll"]()
-            reactorfaceswap = NODE_CLASS_MAPPINGS["ReActorFaceSwap"]()
-            image_comparer_rgthree = NODE_CLASS_MAPPINGS[
-                "Image Comparer (rgthree)"
-            ]()
+            ultimatesdupscale = NODE_CLASS_MAPPINGS["UltimateSDUpscale"]()
             saveimage = NODE_CLASS_MAPPINGS["SaveImage"]()
 
             conditioningconcat_18 = conditioningconcat.concat(
@@ -250,15 +262,36 @@ def main() -> None:
                 conditioning_from=get_value_at_index(cliptextencode_31, 0),
             )
 
-            dwpreprocessor_65 = dwpreprocessor.estimate_pose(
-                detect_hand="disable",
+            openposepreprocessor_66 = openposepreprocessor.estimate_pose(
+                detect_hand="enable",
                 detect_body="enable",
                 detect_face="enable",
                 resolution=512,
-                bbox_detector="yolox_l.onnx",
-                pose_estimator="dw-ll_ucoco_384_bs5.torchscript.pt",
                 scale_stick_for_xinsr_cn="disable",
                 image=get_value_at_index(loadimage_51, 0),
+            )
+
+            lineartpreprocessor_67 = lineartpreprocessor.execute(
+                coarse="disable",
+                resolution=512,
+                image=get_value_at_index(loadimage_51, 0),
+            )
+
+            depthanythingpreprocessor_68 = depthanythingpreprocessor.execute(
+                ckpt_name="depth_anything_vitb14.pth",
+                resolution=512,
+                image=get_value_at_index(loadimage_51, 0),
+            )
+
+            easy_anythingindexswitch_71 = (
+                easy_anythingindexswitch.index_switch(
+                    index=manager.config.sub_configs[
+                        args.config_idx
+                    ].pose_detection_type,
+                    value0=get_value_at_index(openposepreprocessor_66, 0),
+                    value1=get_value_at_index(lineartpreprocessor_67, 0),
+                    value2=get_value_at_index(depthanythingpreprocessor_68, 0),
+                )
             )
 
             controlnetapplyadvanced_35 = (
@@ -269,7 +302,7 @@ def main() -> None:
                     positive=get_value_at_index(conditioningconcat_18, 0),
                     negative=get_value_at_index(conditioningconcat_33, 0),
                     control_net=get_value_at_index(controlnetloader_34, 0),
-                    image=get_value_at_index(dwpreprocessor_65, 0),
+                    image=get_value_at_index(easy_anythingindexswitch_71, 0),
                     vae=get_value_at_index(checkpointloadersimple_12, 2),
                 )
             )
@@ -340,6 +373,34 @@ def main() -> None:
                 unique_id=12735645180315196723,
             )
 
+            ultimatesdupscale_77 = ultimatesdupscale.upscale(
+                upscale_by=1.5000000000000002,
+                seed=random.randint(1, 2**64),
+                steps=20,
+                cfg=8,
+                sampler_name="euler",
+                scheduler="simple",
+                denoise=0.20000000000000004,
+                mode_type="Linear",
+                tile_width=1024,
+                tile_height=1024,
+                mask_blur=8,
+                tile_padding=32,
+                seam_fix_mode="None",
+                seam_fix_denoise=1,
+                seam_fix_width=64,
+                seam_fix_mask_blur=8,
+                seam_fix_padding=16,
+                force_uniform_tiles=True,
+                tiled_decode=False,
+                image=get_value_at_index(vaedecode_8, 0),
+                model=get_value_at_index(last_lora, 0),
+                positive=get_value_at_index(impactswitch_62, 0),
+                negative=get_value_at_index(impactswitch_63, 0),
+                vae=get_value_at_index(checkpointloadersimple_12, 2),
+                upscale_model=get_value_at_index(upscalemodelloader_76, 0),
+            )
+
             reactorfaceswap_57 = reactorfaceswap.execute(
                 enabled=True,
                 swap_model="inswapper_128.onnx",
@@ -352,13 +413,9 @@ def main() -> None:
                 input_faces_index="0",
                 source_faces_index="0",
                 console_log_level=1,
-                input_image=get_value_at_index(vaedecode_8, 0),
+                # input_image=get_value_at_index(easy_imagebatchtoimagelist_79, 0),
+                input_image=get_value_at_index(ultimatesdupscale_77, 0),
                 source_image=get_value_at_index(loadimage_56, 0),
-            )
-
-            image_comparer_rgthree_58 = image_comparer_rgthree.compare_images(
-                image_a=get_value_at_index(vaedecode_8, 0),
-                image_b=get_value_at_index(reactorfaceswap_57, 0),
             )
 
             if manager.config.sub_configs[

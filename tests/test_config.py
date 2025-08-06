@@ -16,6 +16,7 @@ class TestConfig(unittest.TestCase):
             loras=["lora1.safetensors"],
             lora_strengths=[1.0],
             controlnet="controlnet.safetensors",
+            upscaler="upscaler.safetensors",
             disable_controlnet=False,
             steps=10,
             seed=42,
@@ -38,6 +39,7 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(config.loras, ["lora1.safetensors"])
         self.assertEqual(config.lora_strengths, [1.0])
         self.assertEqual(config.controlnet, "controlnet.safetensors")
+        self.assertEqual(config.upscaler, "upscaler.safetensors")
         self.assertEqual(config.disable_controlnet, False)
         self.assertEqual(config.steps, 10)
         self.assertEqual(config.seed, 42)
@@ -63,6 +65,7 @@ class TestConfig(unittest.TestCase):
             loras=["lora1.safetensors"],
             lora_strengths=[1.0],
             controlnet="controlnet.safetensors",
+            upscaler="upscaler.safetensors",
             disable_controlnet=False,
             steps=10,
             seed=42,
@@ -76,6 +79,7 @@ class TestConfig(unittest.TestCase):
             sub_prompts=["sub1"],
             face_swap_images=["/tmp/face1.png"],
             pose_images=["/tmp/pose1.png"],
+            pose_detection_type=0,
             loop_count=1,
             seed_generation=1,
             output_path="/tmp/output",
@@ -86,6 +90,7 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(config.lora_strengths, [1.0])
         self.assertEqual(config.face_swap_images, ["face1.png"])
         self.assertEqual(config.pose_images, ["pose1.png"])
+        self.assertEqual(config.upscaler, "upscaler.safetensors")
 
     def test_config_from_dict_list(self):
         data = [
@@ -94,6 +99,7 @@ class TestConfig(unittest.TestCase):
                 "loras": ["lora1.safetensors"],
                 "lora_strengths": [1.0],
                 "controlnet": "controlnet.safetensors",
+                "upscaler": "upscaler.safetensors",
                 "disable_controlnet": False,
                 "steps": 10,
                 "seed": 42,
@@ -107,6 +113,7 @@ class TestConfig(unittest.TestCase):
                 "sub_prompts": ["sub1"],
                 "face_swap_images": ["face1.png"],
                 "pose_images": ["pose1.png"],
+                "pose_detection_type": 0,
                 "loop_count": 1,
                 "seed_generation": 1,
                 "output_path": pathlib.Path("/tmp/output"),
@@ -117,6 +124,7 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(configs[0].ckpt, "model.safetensors")
         self.assertEqual(configs[0].loras, ["lora1.safetensors"])
         self.assertEqual(configs[0].output_path, pathlib.Path("/tmp/output"))
+        self.assertEqual(configs[0].upscaler, "upscaler.safetensors")
 
     def test_global_config_from_dict(self):
         data = {
@@ -124,6 +132,7 @@ class TestConfig(unittest.TestCase):
             "loras": ["lora1.safetensors"],
             "lora_strengths": [1.0],
             "controlnet": "controlnet.safetensors",
+            "upscaler": "upscaler.safetensors",
             "disable_controlnet": False,
             "steps": 10,
             "seed": 42,
@@ -137,6 +146,7 @@ class TestConfig(unittest.TestCase):
             "sub_prompts": ["sub1"],
             "face_swap_images": ["face1.png"],
             "pose_images": ["pose1.png"],
+            "pose_detection_type": 0,
             "loop_count": 1,
             "seed_generation": 1,
             "output_path": "/tmp/output",
@@ -148,6 +158,7 @@ class TestConfig(unittest.TestCase):
                     "loras": ["lora1.safetensors"],
                     "lora_strengths": [1.0],
                     "controlnet": "controlnet.safetensors",
+                    "upscaler": "upscaler.safetensors",
                     "disable_controlnet": False,
                     "steps": 10,
                     "seed": 42,
@@ -161,6 +172,7 @@ class TestConfig(unittest.TestCase):
                     "sub_prompts": ["sub1"],
                     "face_swap_images": ["face1.png"],
                     "pose_images": ["pose1.png"],
+                    "pose_detection_type": 1,
                     "loop_count": 1,
                     "seed_generation": 1,
                     "output_path": "/tmp/output",
@@ -173,6 +185,7 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(config.venv_path, pathlib.Path("/tmp/comfyui/venv"))
         self.assertEqual(len(config.sub_configs), 1)
         self.assertEqual(config.sub_configs[0].ckpt, "model.safetensors")
+        self.assertEqual(config.upscaler, "upscaler.safetensors")
 
     def test_global_config_dump_and_load(self):
         data = {
@@ -180,6 +193,7 @@ class TestConfig(unittest.TestCase):
             "loras": ["lora1.safetensors"],
             "lora_strengths": [1.0],
             "controlnet": "controlnet.safetensors",
+            "upscaler": "upscaler.safetensors",
             "disable_controlnet": False,
             "steps": 10,
             "seed": 42,
@@ -193,6 +207,7 @@ class TestConfig(unittest.TestCase):
             "sub_prompts": ["sub1"],
             "face_swap_images": ["face1.png"],
             "pose_images": ["pose1.png"],
+            "pose_detection_type": "openpose",
             "loop_count": 1,
             "seed_generation": 1,
             "output_path": "/tmp/output",
@@ -207,6 +222,7 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(loaded.comfyui_path, pathlib.Path("/tmp/comfyui"))
         self.assertEqual(loaded.venv_path, pathlib.Path("/tmp/comfyui/venv"))
         self.assertEqual(loaded.ckpt, "model.safetensors")
+        self.assertEqual(loaded.upscaler, "upscaler.safetensors")
 
     def test_global_config_dict_factory(self):
         path = pathlib.Path("/tmp/foo")
@@ -232,6 +248,7 @@ class TestConfig(unittest.TestCase):
                 "lora_paths": ["lora1.safetensors"],
                 "lora_strengths": [1.0],
                 "controlnet_path": "controlnet.safetensors",
+                "upscaler_path": "upscaler.safetensors",
                 "disable_controlnet": False,
                 "steps": 10,
                 "seed": 42,

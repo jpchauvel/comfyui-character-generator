@@ -13,8 +13,12 @@ lora_paths = [
 # Relative path to the controlnet model in the controlnet directory in ComfyUI. 
 # This Controlnet would be used to calculate the pose based on the poses provided below.
 controlnet_path = "relative/path/to/controlnet.safetensors"
+# Relative path to the upscaler model in the upscaler_models directory in ComfyUI.
+upscaler_path = "relative/path/to/upscaler.safetensors"
 # Tells if you want to bypass the controlnet.
 disable_controlnet = false
+# The pose detection type. 0: OpenPose, 1: Realistic Lineart, 2: Depth
+pose_detection_type = 0
 # The number of steps of the sampler.
 steps = 35
 # The seed of the sampler. You can comment out this option if you want a random seed.
@@ -43,12 +47,56 @@ system_prompt = "a black cat"
 # The system negative prompt. This would be concatenated with the negative prompts.
 system_neg_prompt = "text, watermark, ugly"
 
-# You can add any name after the dash.
+# You can add any name after the dash. Multiple configurations can be added.
 [config-example]
-# The system prompt for this configuration.
-# system prompt = ""
-# The system negative prompt for this configuration.
-# system negative prompt = ""
+##
+#
+# Enable any of the options below to override the global options.
+#
+##
+# Relative path to checkpoint model in the checkpoints directory in ComfyUI.
+#ckpt_path = "relative/path/to/checkpoint.safetensors"
+## Relative path to the character LoRA in the loras directory in ComfyUI.
+#lora_paths = [
+#  "relative/path/to/character_lora.safetensors",
+#  "relative/path/to/lora_enhancer.safetensors"
+#]
+## Relative path to the controlnet model in the controlnet directory in ComfyUI. 
+## This Controlnet would be used to calculate the pose based on the poses provided below.
+#controlnet_path = "relative/path/to/controlnet.safetensors"
+## Relative path to the upscaler model in the upscaler_models directory in ComfyUI.
+#upscaler_path = "relative/path/to/upscaler.safetensors"
+## Tells if you want to bypass the controlnet.
+#disable_controlnet = false
+## The pose detection type. 0: OpenPose, 1: Realistic Lineart, 2: Depth
+#pose_detection_type = 0
+## The number of steps of the sampler.
+#steps = 35
+## The seed of the sampler. You can comment out this option if you want a random seed.
+#seed = 42
+## The guidance scale of the sampler.
+#guidance_scale = 8.0
+## The batch number of images to be generated.
+#batch = 2
+## The strength of the LoRA applied to each of the LoRA provided.
+#lora_strengths = [
+#  1.5,
+#  0.7
+#]
+## The width of the output image(s).
+#width = 1080
+## The aspect ratio of the output image(s). The height would be calculated based on this.
+#aspect_ratio = "4:5"
+## The loop count will tell the number of cycles of the same prompt.
+#loop_count = 6
+## This tells the seed generation type for each cycle. 1: Increment, 2: Decrement, 3: Random
+#seed_generation = 1
+## The output path of the generated image(s).
+#output_path = "/path/to/output/"
+## The system prompt. This would be concatenated with the sub-prompts.
+#system_prompt = "a black cat"
+## The system negative prompt. This would be concatenated with the negative prompts.
+#system_neg_prompt = "text, watermark, ugly"
 # The negative prompts for this configuraiton. Each corresponds to a sub-prompt.
 neg_prompts = [
   "simple background",
