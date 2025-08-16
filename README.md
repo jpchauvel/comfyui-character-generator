@@ -25,7 +25,7 @@ configuration of some parameters (you just have to run the script with the
 To run this tool, just type:
 
 ```sh
-uvx --from git+https://github.com/jpchauvel/comfyui-character-generator comfyui-character-generator --help
+uvx comfyui-character-generator --help
 ```
 
 It will prompt with all the necessary information.
@@ -33,7 +33,7 @@ It will prompt with all the necessary information.
 **NOTE**: You can install the custom nodes using the following command:
 
 ```sh
-uvx --from git+https://github.com/jpchauvel/comfyui-character-generator comfyui-character-generator --install_nodes --confyui_path /path/to/comfyui --venv_path relative/path/to/venv
+uvx comfyui-character-generator --install_nodes --confyui_path /path/to/comfyui --venv_path relative/path/to/venv
 ```
 
 Take a look at the [sample configuration file](/config.toml.example).
