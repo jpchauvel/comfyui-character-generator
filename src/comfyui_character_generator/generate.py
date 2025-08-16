@@ -1,4 +1,5 @@
 import argparse
+import asyncio
 import os
 import pathlib
 import random
@@ -88,7 +89,8 @@ def import_custom_nodes() -> None:
     execution.PromptQueue(server_instance)
 
     # Initializing custom nodes
-    init_extra_nodes()
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(init_extra_nodes())
 
 
 def get_args() -> argparse.Namespace:

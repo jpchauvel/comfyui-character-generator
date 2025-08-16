@@ -37,3 +37,5 @@ uvx --from git+https://github.com/jpchauvel/comfyui-character-generator comfyui-
 ```
 
 Take a look at the [sample configuration file](/config.toml.example).
+
+**NOTE**: This tool works with the [ComfyUI](https://github.com/comfyanonymous/ComfyUI) version 0.3.50 and up.
