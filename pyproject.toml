@@ -1,21 +1,12 @@
 [project]
 name = "comfyui-character-generator"
-version = "0.2.3"
+version = "0.2.4"
 description = "Automated ComfyUI character generator"
 readme = "README.md"
 authors = [
     { name = "Jean-Pierre Chauvel", email = "jean.p.chauvel@gmail.com" }
 ]
 requires-python = ">=3.12, <3.13"
-dependencies = []
-
-[dependency-groups]
-dev = [
-    "black>=25.1.0",
-    "isort>=6.0.1",
-    "pytest>=8.4.1",
-]
-
 classifiers = [
   # How mature is this project? Common values are
   #   3 - Alpha
@@ -30,6 +21,14 @@ classifiers = [
   # Specify the Python versions you support here.
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.12",
+]
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "black>=25.1.0",
+    "isort>=6.0.1",
+    "pytest>=8.4.1",
 ]
 
 [project.urls]
