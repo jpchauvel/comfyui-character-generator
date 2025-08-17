@@ -1,6 +1,6 @@
 [project]
 name = "comfyui-character-generator"
-version = "0.2.2"
+version = "0.2.3"
 description = "Automated ComfyUI character generator"
 readme = "README.md"
 authors = [
@@ -15,6 +15,28 @@ dev = [
     "isort>=6.0.1",
     "pytest>=8.4.1",
 ]
+
+classifiers = [
+  # How mature is this project? Common values are
+  #   3 - Alpha
+  #   4 - Beta
+  #   5 - Production/Stable
+  "Development Status :: 4 - Beta",
+
+  # Indicate who your project is intended for
+  "Intended Audience :: Developers",
+  "Topic :: Software Development :: Build Tools",
+
+  # Specify the Python versions you support here.
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+]
+
+[project.urls]
+Homepage = "https://github.com/jpchauvel/comfyui-character-generator"
+Documentation = "https://github.com/jpchauvel/comfyui-character-generator/blob/main/README.md"
+Repository = "https://github.com/jpchauvel/comfyui-character-generator"
+Issues = "https://github.com/jpchauvel/comfyui-character-generator/issues"
 
 [project.scripts]
 comfyui-character-generator = "comfyui_character_generator.main:main"
