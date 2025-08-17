@@ -1,6 +1,6 @@
 # Automated ComfyUI Character Generator
 
-This tool replicates the ComfyUI workflow that is in the `workflows`
+This tool replicates the ComfyUI workflow that is in the [`workflows`](https://github.com/jpchauvel/comfyui-character-generator/tree/main/workflows)
 subdirectory.
 
 This workflow does the following:
@@ -36,6 +36,6 @@ It will prompt with all the necessary information.
 uvx comfyui-character-generator --install_nodes --confyui_path /path/to/comfyui --venv_path relative/path/to/venv
 ```
 
-Take a look at the [sample configuration file](/config.toml.example).
+Take a look at the [sample configuration file](https://github.com/jpchauvel/comfyui-character-generator/blob/main/config.toml.example).
 
 **NOTE**: This tool works with the [ComfyUI](https://github.com/comfyanonymous/ComfyUI) version 0.3.50 and up.
